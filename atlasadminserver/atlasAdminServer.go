@@ -9,7 +9,6 @@ import (
 	"github.com/coreos/go-oidc"
 
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -106,13 +105,6 @@ func (s *AtlasAdminServer) Run() error {
 	return http.ListenAndServe(endpoint, nil)
 }
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
 func (s *AtlasAdminServer) fetch() {
 
 	var kidsWithBadParents map[string]bool
@@ -124,7 +116,7 @@ func (s *AtlasAdminServer) fetch() {
 		tribes := make(map[string]string)
 		entities := make(map[string]EntityInfo)
 
-		for _, record := range scan(s.redisClient, "tribedata:*") {
+		for _, record := range scanHash(s.redisClient, "tribedata:*") {
 			tribes[record["TribeID"]] = record["TribeName"]
 			fmt.Printf("%+v\n", record)
 		}
@@ -132,7 +124,7 @@ func (s *AtlasAdminServer) fetch() {
 		s.tribeData = tribes
 		s.tribeDataLock.Unlock()
 
-		for _, record := range scan(s.redisClient, "entityinfo:*") {
+		for _, record := range scanHash(s.redisClient, "entityinfo:*") {
 			// log.Println(id)
 			info := newEntityInfo(record)
 			entities[info.EntityID] = *info
@@ -160,7 +152,7 @@ func (s *AtlasAdminServer) fetch() {
 	}
 }
 
-func scan(client *redis.Client, pattern string) map[string]map[string]string {
+func scanHash(client *redis.Client, pattern string) map[string]map[string]string {
 	records := make(map[string]map[string]string)
 
 	start := time.Now()

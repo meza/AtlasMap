@@ -1,6 +1,7 @@
 package atlasadminserver
 
 import (
+	"os"
 	"strconv"
 )
 
@@ -15,6 +16,13 @@ type Configuration struct {
 	RedisAddress       string
 	RedisPassword      string
 	RedisDB            int
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
 
 func (s *AtlasAdminServer) loadConfig() error {
