@@ -16,6 +16,10 @@ type Configuration struct {
 	RedisAddress       string
 	RedisPassword      string
 	RedisDB            int
+
+	AtlasRedisAddress  string
+	AtlasRedisPassword string
+	AtlasRedisDB       int
 }
 
 func getEnv(key, fallback string) string {
@@ -50,6 +54,10 @@ func (s *AtlasAdminServer) loadConfig() error {
 	s.config.RedisAddress = getEnv("REDIS_ADDRESS", "localhost:6379")
 	s.config.RedisPassword = getEnv("REDIS_PASSWORD", "foobared")
 	s.config.RedisDB, err = strconv.Atoi(getEnv("REDIS_DB", "0"))
+
+	s.config.AtlasRedisAddress = getEnv("ATLAS_REDIS_ADDRESS", "localhost:6379")
+	s.config.AtlasRedisPassword = getEnv("ATLAS_REDIS_PASSWORD", "foobared")
+	s.config.AtlasRedisDB, err = strconv.Atoi(getEnv("ATLAS_REDIS_DB", "0"))
 	if err != nil {
 		return err
 	}

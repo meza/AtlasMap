@@ -7,11 +7,8 @@ import (
 )
 
 func main() {
-	s, err := atlasadminserver.NewAtlasAdminServer()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if err = s.Run(); err != nil {
+	s := atlasadminserver.NewAtlasAdminServer()
+	if err := s.Run(); err != nil {
 		log.Fatalln(err)
 	}
 	log.Println("Server quit!")

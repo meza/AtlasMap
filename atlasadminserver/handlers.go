@@ -11,7 +11,6 @@ import (
 )
 
 func (s *AtlasAdminServer) getTerritoryURL(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
@@ -28,7 +27,6 @@ func (s *AtlasAdminServer) getTerritoryURL(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *AtlasAdminServer) getTribes(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
@@ -46,7 +44,6 @@ func (s *AtlasAdminServer) getTribes(w http.ResponseWriter, r *http.Request) {
 
 // getData returns the latest game data pulled from the backend.
 func (s *AtlasAdminServer) getData(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
@@ -64,7 +61,6 @@ func (s *AtlasAdminServer) getData(w http.ResponseWriter, r *http.Request) {
 
 // getPathTravelled returns a fake path for the specified ship.
 func (s *AtlasAdminServer) getPathTravelled(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != "GET" {
@@ -113,7 +109,6 @@ func (s *AtlasAdminServer) getPathTravelled(w http.ResponseWriter, r *http.Reque
 // redis PubSub channel. To send a server command, prepend "ID::X,Y::" where
 // ID is the packed server ID; X and Y are the relative lng and lat locations.
 func (s *AtlasAdminServer) sendCommand(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != "POST" || s.config.DisableCommands {
@@ -136,7 +131,6 @@ func (s *AtlasAdminServer) sendCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//encoded := fmt.Sprintf("Map::%s", body)
 	encoded := fmt.Sprintf("%s", body)
 
 	log.Println("publish:", encoded)

@@ -1,12 +1,10 @@
 package atlasadminserver
 
 import (
-	"context"
-	"encoding/binary"
 	"fmt"
 	"log"
 
-	"github.com/coreos/go-oidc"
+	"github.com/antihax/AtlasMap/internal/atlasdb"
 
 	"net/http"
 	"strconv"
@@ -19,20 +17,31 @@ import (
 
 // AtlasAdminServer provides administrative services to an Atlas Cluster over http
 type AtlasAdminServer struct {
-	redisClient   *redis.Client
-	gameData      map[string]EntityInfo
-	gameDataLock  sync.RWMutex
+	redisClient  *redis.Client
+	gameData     map[string]EntityInfo
+	gameDataLock sync.RWMutex
+
 	tribeData     map[string]string
 	tribeDataLock sync.RWMutex
-	config        *Configuration
-	steamOpenID   *oidc.Provider
+
+	playerData     map[string]map[string]string
+	playerDataLock sync.RWMutex
+
+	steamData     map[string]string
+	steamDataLock sync.RWMutex
+
+	config *Configuration
+
+	db *atlasdb.AtlasDB
 }
 
 // NewAtlasAdminServer creates a new server
 func NewAtlasAdminServer() *AtlasAdminServer {
 	return &AtlasAdminServer{
-		gameData:  make(map[string]EntityInfo),
-		tribeData: make(map[string]string),
+		gameData:   make(map[string]EntityInfo),
+		tribeData:  make(map[string]string),
+		playerData: make(map[string]map[string]string),
+		steamData:  make(map[string]string),
 	}
 }
 
@@ -65,34 +74,39 @@ func (s *AtlasAdminServer) Run() error {
 	if err := s.loadConfig(); err != nil {
 		return err
 	}
+	/*
+		// Setup redis connection
+		s.redisClient = redis.NewClient(&redis.Options{
+			Addr:     s.config.RedisAddress,
+			Password: s.config.RedisPassword,
+			DB:       s.config.RedisDB,
+		})
 
-	// Setup redis connection
-	s.redisClient = redis.NewClient(&redis.Options{
-		Addr:     s.config.RedisAddress,
-		Password: s.config.RedisPassword,
-		DB:       s.config.RedisDB,
-	})
+		// Test connection
+		_, err := s.redisClient.Ping().Result()
+		if err != nil {
+			return err
+		}*/
 
-	// Test connection
-	_, err := s.redisClient.Ping().Result()
+	// Setup our DB pool
+	db, err := atlasdb.NewAtlasDB(
+		s.config.AtlasRedisAddress,
+		s.config.AtlasRedisPassword,
+		s.config.AtlasRedisDB,
+	)
 	if err != nil {
 		return err
 	}
-
-	// Get an OpenID Provider
-	s.steamOpenID, err = oidc.NewProvider(context.Background(), "https://steamcommunity.com/openid")
-	if err != nil {
-		return err
-	}
+	s.db = db
 
 	// Poll the database for data
 	go s.fetch()
 
 	// Setup handlers
-	http.HandleFunc("/gettribes", s.getTribes)
-	http.HandleFunc("/getdata", s.getData)
-	http.HandleFunc("/travels", s.getPathTravelled)
-	http.HandleFunc("/territoryURL", s.getTerritoryURL)
+	http.Handle("/gettribes", ourMiddleware(http.HandlerFunc(s.getTribes)))
+	http.Handle("/getdata", ourMiddleware(http.HandlerFunc(s.getData)))
+	http.Handle("/travels", ourMiddleware(http.HandlerFunc(s.getPathTravelled)))
+	http.Handle("/territoryURL", ourMiddleware(http.HandlerFunc(s.getTerritoryURL)))
 	http.Handle("/", http.FileServer(http.Dir(s.config.StaticDir)))
 
 	// Don't serve command handler if disabled
@@ -106,29 +120,55 @@ func (s *AtlasAdminServer) Run() error {
 }
 
 func (s *AtlasAdminServer) fetch() {
-
-	var kidsWithBadParents map[string]bool
-	kidsWithBadParents = make(map[string]bool)
-
-	throttle := time.NewTimer(time.Duration(s.config.FetchRateInSeconds) * time.Second)
+	kidsWithBadParents := make(map[string]bool)
+	throttle := time.NewTicker(time.Duration(s.config.FetchRateInSeconds) * time.Second)
 
 	for {
 		tribes := make(map[string]string)
 		entities := make(map[string]EntityInfo)
 
-		for _, record := range scanHash(s.redisClient, "tribedata:*") {
+		// Get all tribe information
+		t, err := s.db.GetAllTribes()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		for _, record := range t {
 			tribes[record["TribeID"]] = record["TribeName"]
-			fmt.Printf("%+v\n", record)
 		}
 		s.tribeDataLock.Lock()
 		s.tribeData = tribes
 		s.tribeDataLock.Unlock()
 
-		for _, record := range scanHash(s.redisClient, "entityinfo:*") {
-			// log.Println(id)
+		// Get the steamID=>playerID lookup
+		steamData, err := s.db.GetReverseSteamIDMap()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		s.steamDataLock.Lock()
+		s.steamData = steamData
+		s.steamDataLock.Unlock()
+
+		// Get player data
+		playerData, err := s.db.GetAllPlayers()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		s.playerDataLock.Lock()
+		s.playerData = playerData
+		s.playerDataLock.Unlock()
+
+		// Get all beds and ships
+		e, err := s.db.GetAllEntities()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		for _, record := range e {
 			info := newEntityInfo(record)
 			entities[info.EntityID] = *info
-			fmt.Printf("%+v\n", info)
 		}
 
 		// sanity check entity data, e.g. any missing parent ids?
@@ -137,71 +177,17 @@ func (s *AtlasAdminServer) fetch() {
 				if _, parentFound := entities[v.ParentEntityID]; !parentFound {
 					if _, dontSpamLog := kidsWithBadParents[k]; !dontSpamLog {
 						kidsWithBadParents[k] = true
-						log.Printf("Entity %s references parent %s that does not exist, removing from list", k, v.ParentEntityID)
 					}
 					delete(entities, k)
 				}
 			}
 		}
-
 		s.gameDataLock.Lock()
 		s.gameData = entities
 		s.gameDataLock.Unlock()
 
 		<-throttle.C
 	}
-}
-
-func scanHash(client *redis.Client, pattern string) map[string]map[string]string {
-	records := make(map[string]map[string]string)
-
-	start := time.Now()
-
-	// Scan is slower than Keys but provides gaps for other things to execute
-	var keys []string
-	iter := client.Scan(0, pattern, 5000).Iterator()
-	for iter.Next() {
-		keys = append(keys, iter.Val())
-	}
-	if err := iter.Err(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Load each entity
-	results := make(map[string]*redis.StringStringMapCmd)
-	pipe := client.Pipeline()
-	for _, id := range keys {
-		results[id] = pipe.HGetAll(id)
-	}
-	pipe.Exec()
-	for _, id := range keys {
-		records[id], _ = results[id].Result()
-	}
-
-	elapsed := time.Since(start)
-	log.Printf("Redis scan took %s", elapsed)
-
-	return records
-}
-
-// serverID unpacks the packed server ID. Each Server has an X and Y ID which
-// corresponds to its 2D location in the game world. The ID is packed into
-// 32-bits as follows:
-//   +--------------+--------------+
-//   | X (uint16_t) | Y (uint16_t) |
-//   +--------------+--------------+
-func serverID(packed string) (split [2]uint16, err error) {
-	var id uint64
-	id, err = strconv.ParseUint(packed, 10, 32)
-	if err != nil {
-		return
-	}
-
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, uint32(id))
-	split[0] = binary.LittleEndian.Uint16(buf[:2])
-	split[1] = binary.LittleEndian.Uint16(buf[2:])
-	return
 }
 
 // newEntityInfo transforms a Key-Value record into a new EntityInfo object.
@@ -219,15 +205,15 @@ func newEntityInfo(record map[string]string) *EntityInfo {
 	var ok bool
 	var tmpTribeID string
 	if tmpTribeID, ok = record["TribeID"]; !ok {
-		tmpTribeID, _ = record["TribeId"]
+		tmpTribeID = record["TribeId"]
 	}
 	info.TribeID = tmpTribeID
 
 	var tmpServerID string
 	if tmpServerID, ok = record["ServerID"]; !ok {
-		tmpServerID, _ = record["ServerId"]
+		tmpServerID = record["ServerId"]
 	}
-	info.ServerID, _ = serverID(tmpServerID)
+	info.ServerID, _ = atlasdb.ServerID(tmpServerID)
 
 	// convert entity class to a subtype
 	var tmpEntityClass string
