@@ -1,9 +1,12 @@
 package atlasadminserver
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log"
+
+	"github.com/coreos/go-oidc"
 
 	"net/http"
 	"os"
@@ -23,15 +26,15 @@ type AtlasAdminServer struct {
 	tribeData     map[string]string
 	tribeDataLock sync.RWMutex
 	config        *Configuration
+	steamOpenID   *oidc.Provider
 }
 
 // NewAtlasAdminServer creates a new server
-func NewAtlasAdminServer() (*AtlasAdminServer, error) {
-
+func NewAtlasAdminServer() *AtlasAdminServer {
 	return &AtlasAdminServer{
 		gameData:  make(map[string]EntityInfo),
 		tribeData: make(map[string]string),
-	}, nil
+	}
 }
 
 // EntityInfo record in redis.
@@ -77,6 +80,12 @@ func (s *AtlasAdminServer) Run() error {
 		return err
 	}
 
+	// Get an OpenID Provider
+	s.steamOpenID, err = oidc.NewProvider(context.Background(), "https://steamcommunity.com/openid")
+	if err != nil {
+		return err
+	}
+
 	// Poll the database for data
 	go s.fetch()
 
@@ -109,12 +118,15 @@ func (s *AtlasAdminServer) fetch() {
 	var kidsWithBadParents map[string]bool
 	kidsWithBadParents = make(map[string]bool)
 
+	throttle := time.NewTimer(time.Duration(s.config.FetchRateInSeconds) * time.Second)
+
 	for {
 		tribes := make(map[string]string)
 		entities := make(map[string]EntityInfo)
 
 		for _, record := range scan(s.redisClient, "tribedata:*") {
 			tribes[record["TribeID"]] = record["TribeName"]
+			fmt.Printf("%+v\n", record)
 		}
 		s.tribeDataLock.Lock()
 		s.tribeData = tribes
@@ -124,6 +136,7 @@ func (s *AtlasAdminServer) fetch() {
 			// log.Println(id)
 			info := newEntityInfo(record)
 			entities[info.EntityID] = *info
+			fmt.Printf("%+v\n", info)
 		}
 
 		// sanity check entity data, e.g. any missing parent ids?
@@ -143,7 +156,7 @@ func (s *AtlasAdminServer) fetch() {
 		s.gameData = entities
 		s.gameDataLock.Unlock()
 
-		time.Sleep(time.Duration(s.config.FetchRateInSeconds) * time.Second)
+		<-throttle.C
 	}
 }
 
