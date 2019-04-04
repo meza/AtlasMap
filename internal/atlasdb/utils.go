@@ -3,6 +3,7 @@ package atlasdb
 import (
 	"encoding/binary"
 	"strconv"
+	"strings"
 
 	"github.com/go-redis/redis"
 )
@@ -57,8 +58,13 @@ func (s *AtlasDB) scanHash(pattern string, maxItems int64) (map[string]map[strin
 
 	// Build a map of the results
 	for _, id := range keys {
+		key := id
+		if strings.Contains(id, ":") {
+			parts := strings.Split(id, ":")
+			key = parts[1]
+		}
 		var err error
-		records[id], err = results[id].Result()
+		records[key], err = results[id].Result()
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +112,12 @@ func (s *AtlasDB) scanString(pattern string, maxItems int64) (map[string]string,
 	// Build a map of the results
 	for _, id := range keys {
 		var err error
-		records[id], err = results[id].Result()
+		key := id
+		if strings.Contains(id, ":") {
+			parts := strings.Split(id, ":")
+			key = parts[1]
+		}
+		records[key], err = results[id].Result()
 		if err != nil {
 			return nil, err
 		}
