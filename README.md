@@ -11,15 +11,23 @@ You need to generate a slippy style map (See ServerGridEditor or other tools), c
 The following environment variables can be set to reconfigure the service:
 
 `PORT` webservice port. default 8880
+
 `DISABLECOMMANDS` disables the remote commands to the cluster. default true
+
 `FETCHRATE` Atlas Redis polling frequency in seconds. default 15
+
 `TERRITORY_URL` Optional link to territory server. default http://localhost:8881/territoryTiles/
+
 `STATICDIR` location of static server files. default ./www
+
 `SESSION_PATH` location of session store files. default ./store
+
 `SESSION_KEY` Session encryption key *MUST BE SET ON PRODUCTION*. default is random.
 
 `ATLAS_REDIS_ADDRESS` Atlas Redis Address. default is localhost:6379.
+
 `ATLAS_REDIS_PASSWORD` Atlas Redis Password. default is foobared.
+
 `ATLAS_REDIS_DB` Atlas Redis DB. default is 0.
 
 ### Web App
