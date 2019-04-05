@@ -3,6 +3,7 @@ package atlasadminserver
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/securecookie"
 )
@@ -19,6 +20,8 @@ type Configuration struct {
 	AtlasRedisAddress  string
 	AtlasRedisPassword string
 	AtlasRedisDB       int
+
+	AdminSteamIDs []string
 
 	/*
 		RedisAddress       string
@@ -73,6 +76,8 @@ func (s *AtlasAdminServer) loadConfig() error {
 	if err != nil {
 		return err
 	}
+
+	s.config.AdminSteamIDs = strings.Split(getEnv("ADMIN_STEAMID_LIST", ""), " ")
 
 	return nil
 }
