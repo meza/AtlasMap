@@ -115,6 +115,8 @@ func (s *AtlasAdminServer) Run() error {
 	http.Handle("/", http.FileServer(http.Dir(s.config.StaticDir)))
 
 	http.Handle("/login", ourMiddleware(http.HandlerFunc(s.loginHandler)))
+	http.Handle("/logout", ourMiddleware(http.HandlerFunc(s.logoutHandler)))
+	http.Handle("/account", ourMiddleware(http.HandlerFunc(s.accountHandler)))
 
 	// Don't serve command handler if disabled
 	if !s.config.DisableCommands {
