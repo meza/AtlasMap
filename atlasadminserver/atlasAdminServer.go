@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/antihax/AtlasMap/internal/atlasdb"
+	"github.com/gorilla/sessions"
 
 	"net/http"
 	"strconv"
@@ -33,6 +34,8 @@ type AtlasAdminServer struct {
 	config *Configuration
 
 	db *atlasdb.AtlasDB
+
+	store *sessions.FilesystemStore
 }
 
 // NewAtlasAdminServer creates a new server
@@ -74,6 +77,8 @@ func (s *AtlasAdminServer) Run() error {
 	if err := s.loadConfig(); err != nil {
 		return err
 	}
+
+	s.store = sessions.NewFilesystemStore(s.config.SessionStore, []byte(s.config.SessionKey))
 	/*
 		// Setup redis connection
 		s.redisClient = redis.NewClient(&redis.Options{
@@ -108,6 +113,8 @@ func (s *AtlasAdminServer) Run() error {
 	http.Handle("/travels", ourMiddleware(http.HandlerFunc(s.getPathTravelled)))
 	http.Handle("/territoryURL", ourMiddleware(http.HandlerFunc(s.getTerritoryURL)))
 	http.Handle("/", http.FileServer(http.Dir(s.config.StaticDir)))
+
+	http.Handle("/login", ourMiddleware(http.HandlerFunc(s.loginHandler)))
 
 	// Don't serve command handler if disabled
 	if !s.config.DisableCommands {

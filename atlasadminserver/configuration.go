@@ -3,6 +3,8 @@ package atlasadminserver
 import (
 	"os"
 	"strconv"
+
+	"github.com/gorilla/securecookie"
 )
 
 // Configuration options for the server.
@@ -13,13 +15,20 @@ type Configuration struct {
 	StaticDir          string
 	DisableCommands    bool
 	FetchRateInSeconds int
-	RedisAddress       string
-	RedisPassword      string
-	RedisDB            int
 
 	AtlasRedisAddress  string
 	AtlasRedisPassword string
 	AtlasRedisDB       int
+
+	/*
+		RedisAddress       string
+		RedisPassword      string
+		RedisDB            int
+	*/
+
+	// FS Store for now, may change to redis
+	SessionStore string
+	SessionKey   string
 }
 
 func getEnv(key, fallback string) string {
@@ -51,9 +60,12 @@ func (s *AtlasAdminServer) loadConfig() error {
 	s.config.TerritoryURL = getEnv("TERRITORY_URL", "http://localhost:8881/territoryTiles/")
 	s.config.StaticDir = getEnv("STATICDIR", "./www")
 
-	s.config.RedisAddress = getEnv("REDIS_ADDRESS", "localhost:6379")
+	s.config.SessionStore = getEnv("SESSION_PATH", "./store")
+	s.config.SessionKey = getEnv("SESSION_KEY", string(securecookie.GenerateRandomKey(64)))
+
+	/*s.config.RedisAddress = getEnv("REDIS_ADDRESS", "localhost:6379")
 	s.config.RedisPassword = getEnv("REDIS_PASSWORD", "foobared")
-	s.config.RedisDB, err = strconv.Atoi(getEnv("REDIS_DB", "0"))
+	s.config.RedisDB, err = strconv.Atoi(getEnv("REDIS_DB", "0"))*/
 
 	s.config.AtlasRedisAddress = getEnv("ATLAS_REDIS_ADDRESS", "localhost:6379")
 	s.config.AtlasRedisPassword = getEnv("ATLAS_REDIS_PASSWORD", "foobared")
