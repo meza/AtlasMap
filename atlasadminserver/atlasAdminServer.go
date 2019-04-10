@@ -22,7 +22,7 @@ type AtlasAdminServer struct {
 	gameData     map[string]EntityInfo
 	gameDataLock sync.RWMutex
 
-	tribeData     map[string]string
+	tribeData     map[string]map[string]string
 	tribeDataLock sync.RWMutex
 
 	playerData     map[string]map[string]string
@@ -42,7 +42,7 @@ type AtlasAdminServer struct {
 func NewAtlasAdminServer() *AtlasAdminServer {
 	return &AtlasAdminServer{
 		gameData:   make(map[string]EntityInfo),
-		tribeData:  make(map[string]string),
+		tribeData:  make(map[string]map[string]string),
 		playerData: make(map[string]map[string]string),
 		steamData:  make(map[string]string),
 	}
@@ -133,18 +133,15 @@ func (s *AtlasAdminServer) fetch() {
 	throttle := time.NewTicker(time.Duration(s.config.FetchRateInSeconds) * time.Second)
 
 	for {
-		tribes := make(map[string]string)
 		entities := make(map[string]EntityInfo)
 
 		// Get all tribe information
-		t, err := s.db.GetAllTribes()
+		tribes, err := s.db.GetAllTribes()
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		for _, record := range t {
-			tribes[record["TribeID"]] = record["TribeName"]
-		}
+
 		s.tribeDataLock.Lock()
 		s.tribeData = tribes
 		s.tribeDataLock.Unlock()

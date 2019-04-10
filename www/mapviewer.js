@@ -738,7 +738,7 @@ class Legend extends React.Component {
 
     return (
     <div id="Legend" className="info legend">
-      {Object.keys(tribes).map(id => {return (<div key={id}><i style={{background:getTribeColor(id)}}></i>{tribes[id]}<br/></div>)})}
+      {Object.keys(tribes).map(id => {return (<div key={id}><i style={{background:getTribeColor(id)}}></i>{tribes[id].TribeName}<br/></div>)})}
       <div key={'none'}><i style={{background:'grey'}}></i>{'non-tribe'}<br/></div>
     </div>);
   }

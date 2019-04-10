@@ -3,6 +3,7 @@ package atlasadminserver
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/prometheus/common/log"
 	"github.com/solovev/steam_go"
@@ -58,6 +59,48 @@ func (s *AtlasAdminServer) loginHandler(w http.ResponseWriter, r *http.Request) 
 		}
 		http.Redirect(w, r, "/", 301)
 	}
+}
+
+// Determine if the request is an administrator
+func (s *AtlasAdminServer) isAdmin(r *http.Request) bool {
+	session, err := s.store.Get(r, "atlas-session")
+	if err != nil {
+		return false
+	}
+	steamID, ok := session.Values["steamID"].(string)
+	if ok {
+		for _, id := range s.config.AdminSteamIDs {
+			if steamID == id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Determine if the request is a tribe administrator
+func (s *AtlasAdminServer) isTribeAdmin(r *http.Request) bool {
+	session, err := s.store.Get(r, "atlas-session")
+	if err != nil {
+		return false
+	}
+	steamID, ok := session.Values["steamID"].(string)
+	if ok {
+		tribe, err := s.getTribeDataFromSteamID(steamID)
+		if err != nil {
+			return false
+		}
+		admins, ok := tribe["TribeAdmins"]
+		if ok {
+			for _, admin := range strings.Split(strings.Trim(admins, "()[]"), " ") {
+				if steamID == admin {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func (s *AtlasAdminServer) accountHandler(w http.ResponseWriter, r *http.Request) {
