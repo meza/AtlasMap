@@ -13,3 +13,4 @@ mock-local.sh
 /testData/*
 /store/*
 /dist/*
+__debug_bin

@@ -1,4 +1,4 @@
-package atlasadminserver
+package atlasmapserver
 
 import (
 	"os"
@@ -41,10 +41,10 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func (s *AtlasAdminServer) loadConfig() error {
+func (s *AtlasMapServer) loadConfig() error {
 	s.config = &Configuration{}
 
-	port, err := strconv.ParseUint(getEnv("PORT", "8880"), 10, 16)
+	port, err := strconv.ParseUint(getEnv("PORT", "3000"), 10, 16)
 	if err != nil {
 		return err
 	}
@@ -66,12 +66,8 @@ func (s *AtlasAdminServer) loadConfig() error {
 	s.config.SessionStore = getEnv("SESSION_PATH", "./store")
 	s.config.SessionKey = getEnv("SESSION_KEY", string(securecookie.GenerateRandomKey(64)))
 
-	/*s.config.RedisAddress = getEnv("REDIS_ADDRESS", "localhost:6379")
-	s.config.RedisPassword = getEnv("REDIS_PASSWORD", "foobared")
-	s.config.RedisDB, err = strconv.Atoi(getEnv("REDIS_DB", "0"))*/
-
 	s.config.AtlasRedisAddress = getEnv("ATLAS_REDIS_ADDRESS", "localhost:6379")
-	s.config.AtlasRedisPassword = getEnv("ATLAS_REDIS_PASSWORD", "foobared")
+	s.config.AtlasRedisPassword = getEnv("ATLAS_REDIS_PASSWORD", "")
 	s.config.AtlasRedisDB, err = strconv.Atoi(getEnv("ATLAS_REDIS_DB", "0"))
 	if err != nil {
 		return err

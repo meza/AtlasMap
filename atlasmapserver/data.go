@@ -1,8 +1,8 @@
-package atlasadminserver
+package atlasmapserver
 
 import "errors"
 
-func (s *AtlasAdminServer) getPlayerIDFromSteamID(steamID string) (string, error) {
+func (s *AtlasMapServer) getPlayerIDFromSteamID(steamID string) (string, error) {
 	s.steamDataLock.RLock()
 	playerID, ok := s.steamData[steamID]
 	s.steamDataLock.RUnlock()
@@ -12,7 +12,7 @@ func (s *AtlasAdminServer) getPlayerIDFromSteamID(steamID string) (string, error
 	return playerID, nil
 }
 
-func (s *AtlasAdminServer) getPlayerDataFromSteamID(steamID string) (map[string]string, error) {
+func (s *AtlasMapServer) getPlayerDataFromSteamID(steamID string) (map[string]string, error) {
 	playerID, err := s.getPlayerIDFromSteamID(steamID)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func (s *AtlasAdminServer) getPlayerDataFromSteamID(steamID string) (map[string]
 	return s.playerData[playerID], nil
 }
 
-func (s *AtlasAdminServer) getTribeDataFromSteamID(steamID string) (map[string]string, error) {
+func (s *AtlasMapServer) getTribeDataFromSteamID(steamID string) (map[string]string, error) {
 	playerData, err := s.getPlayerDataFromSteamID(steamID)
 	if err != nil {
 		return nil, err

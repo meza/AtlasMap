@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/antihax/AtlasMap/atlasadminserver"
+	"github.com/antihax/AtlasMap/atlasmapserver"
 )
 
 func main() {
-	s := atlasadminserver.NewAtlasAdminServer()
+	s := atlasmapserver.NewAtlasMapServer()
 	if err := s.Run(); err != nil {
 		log.Fatalln(err)
 	}

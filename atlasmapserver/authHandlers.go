@@ -1,4 +1,4 @@
-package atlasadminserver
+package atlasmapserver
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/solovev/steam_go"
 )
 
-func (s *AtlasAdminServer) logoutHandler(w http.ResponseWriter, r *http.Request) {
+func (s *AtlasMapServer) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := s.store.Get(r, "atlas-session")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -30,7 +30,7 @@ func (s *AtlasAdminServer) logoutHandler(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/", 301)
 }
 
-func (s *AtlasAdminServer) loginHandler(w http.ResponseWriter, r *http.Request) {
+func (s *AtlasMapServer) loginHandler(w http.ResponseWriter, r *http.Request) {
 	opID := steam_go.NewOpenId(r)
 	switch opID.Mode() {
 	case "":
@@ -62,7 +62,7 @@ func (s *AtlasAdminServer) loginHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 // Determine if the request is an administrator
-func (s *AtlasAdminServer) isAdmin(r *http.Request) bool {
+func (s *AtlasMapServer) isAdmin(r *http.Request) bool {
 	session, err := s.store.Get(r, "atlas-session")
 	if err != nil {
 		return false
@@ -79,7 +79,7 @@ func (s *AtlasAdminServer) isAdmin(r *http.Request) bool {
 }
 
 // Determine if the request is a tribe administrator
-func (s *AtlasAdminServer) isTribeAdmin(r *http.Request) bool {
+func (s *AtlasMapServer) isTribeAdmin(r *http.Request) bool {
 	session, err := s.store.Get(r, "atlas-session")
 	if err != nil {
 		return false
@@ -103,7 +103,7 @@ func (s *AtlasAdminServer) isTribeAdmin(r *http.Request) bool {
 	return false
 }
 
-func (s *AtlasAdminServer) accountHandler(w http.ResponseWriter, r *http.Request) {
+func (s *AtlasMapServer) accountHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := s.store.Get(r, "atlas-session")
 
 	steamID, ok := session.Values["steamID"].(string)

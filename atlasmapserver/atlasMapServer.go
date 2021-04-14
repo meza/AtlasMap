@@ -1,4 +1,4 @@
-package atlasadminserver
+package atlasmapserver
 
 import (
 	"fmt"
@@ -16,8 +16,8 @@ import (
 	"github.com/go-redis/redis"
 )
 
-// AtlasAdminServer provides administrative services to an Atlas Cluster over http
-type AtlasAdminServer struct {
+// AtlasMapServer provides administrative services to an Atlas Cluster over http
+type AtlasMapServer struct {
 	redisClient  *redis.Client
 	gameData     map[string]EntityInfo
 	gameDataLock sync.RWMutex
@@ -38,9 +38,9 @@ type AtlasAdminServer struct {
 	store *sessions.FilesystemStore
 }
 
-// NewAtlasAdminServer creates a new server
-func NewAtlasAdminServer() *AtlasAdminServer {
-	return &AtlasAdminServer{
+// NewAtlasMapServer creates a new server
+func NewAtlasMapServer() *AtlasMapServer {
+	return &AtlasMapServer{
 		gameData:   make(map[string]EntityInfo),
 		tribeData:  make(map[string]map[string]string),
 		playerData: make(map[string]map[string]string),
@@ -71,7 +71,7 @@ type ServerLocation struct {
 }
 
 // Run starts the server processing
-func (s *AtlasAdminServer) Run() error {
+func (s *AtlasMapServer) Run() error {
 
 	// Load configuration from environment
 	if err := s.loadConfig(); err != nil {
@@ -128,7 +128,7 @@ func (s *AtlasAdminServer) Run() error {
 	return http.ListenAndServe(endpoint, nil)
 }
 
-func (s *AtlasAdminServer) fetch() {
+func (s *AtlasMapServer) fetch() {
 	kidsWithBadParents := make(map[string]bool)
 	throttle := time.NewTicker(time.Duration(s.config.FetchRateInSeconds) * time.Second)
 

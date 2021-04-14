@@ -1,4 +1,4 @@
-package atlasadminserver
+package atlasmapserver
 
 import (
 	"log"

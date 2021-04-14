@@ -1,7 +1,9 @@
 // Package atlasdb handles the redis data flow with the Atlas Redis server
 package atlasdb
 
-import "github.com/go-redis/redis"
+import (
+	"github.com/go-redis/redis"
+)
 
 // AtlasDB provides an interface to the Atlas DB
 type AtlasDB struct {

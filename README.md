@@ -28,7 +28,7 @@ The following environment variables can be set to reconfigure the service:
 
 `ATLAS_REDIS_ADDRESS` Atlas Redis Address. default is localhost:6379.
 
-`ATLAS_REDIS_PASSWORD` Atlas Redis Password. default is foobared.
+`ATLAS_REDIS_PASSWORD` Atlas Redis Password. default is no password.
 
 `ATLAS_REDIS_DB` Atlas Redis DB. default is 0.
 
