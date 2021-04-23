@@ -1,9 +1,5 @@
 const config = {
-    ServersX: 15,
-    ServersY: 15,
-    Suggestions: [
-        "spawnshipfast name",
-        "spawnbed name",
-        "destroyall",
-    ]
+	"GridSize": 1400000,
+	"ServersX": 2,
+	"ServersY": 1
 }

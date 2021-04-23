@@ -1,192 +1,14 @@
 if (!window) {
-  // Only included for VS Code Intellisense
-  function require() { }
+  function require() {}
   const
     React = require("react"),
     ReactDOM = require("react-dom"),
-    L = require("leaflet")
-}
-
-// possibilities are a list of all known commands and their parameters
-const possibilities = config.Suggestions
-
-const icon = (type, subtype, color) => L.icon({
-  iconUrl: `${type}/${subtype}/${color}.png`,
-  iconSize: [24, 24], // size of the icon
-  iconAnchor: [12, 12], // point of the icon which will correspond to marker's location
-  popupAnchor: [-4, -24] // point from which the popup should open relative to the iconAnchor
-})
-
-const subtypes = (
-  "None Raft Dingy Sloop Schooner Brigantine Galleon"
-).split(" ")
-
-const colors = (
-  "red green yellow blue orange purple cyan magenta lime pink teal lavender brown beige maroon olive coral navy"
-).split(" ")
-
-const reservedColors = (
-  "black grey"
-).split(" ")
-
-const allColors = [...colors, ...reservedColors]
-
-const icons = {
-  Bed: {
-    None: {}
-  },
-  Ship: {
-    None: {}
-  }
-}
-
-allColors.forEach(color => {
-  icons["Bed"]["None"][color] = icon("bed", "None", color)
-})
-
-subtypes.forEach(subtype => {
-  icons["Ship"][subtype] = {}
-  allColors.forEach(color => {
-    icons["Ship"][subtype][color] = icon("ship", subtype, color)
-  })
-})
-
-class EntityMarker extends React.Component {
-  constructor(props) {
-    super(props)
-    this.add = this.add.bind(this)
-    this.del = this.del.bind(this)
-  }
-
-  componentDidMount() {
-    this.add()
-  }
-  componentDidUpdate() {
-    this.del()
-    this.add()
-  }
-  componentWillUnmount() {
-    this.del()
-  }
-  render() {
-    return null
-  }
-
-  add() {
-    this.marker = createEntityMarker(this.props.info, this.props.map)
-    this.marker.on("popupopen", this.props.onPopupOpen)
-    this.marker.on("popupclose", this.props.onPopupClose)
-  }
-
-  del() {
-    if (!this.marker)
-      return
-
-    this.marker.off("popupopen", this.props.onPopupOpen)
-    this.marker.off("popupclose", this.props.onPopupClose)
-    this.marker.remove()
-    delete this.marker
-  }
-}
-
-class CommandMarker extends React.Component {
-  componentDidMount() {
-    const { map, latlng, onClose } = this.props
-
-    this.marker =
-      L.marker(latlng).addTo(map)
-        //.bindPopup("Enter command")
-        .openPopup()
-        .on("popupclose", onClose)
-
-    // const [srv, x, y] = calcServerLocation(e.latlng)
-    // console.log(`${srv}::${x},${y}::`)
-    // document.getElementById("cmd").update(`${srv}::${x},${y}::`, true)
-  }
-
-  componentDidUpdate() {
-    this.marker.setLatLng(this.props.latlng)
-  }
-
-  componentWillUnmount() {
-    this.props.map.removeLayer(this.marker)
-  }
-
-  render() { return null }
-}
-
-class ShipPath extends React.Component {
-  constructor(props) {
-    super(props)
-    this.add = this.add.bind(this)
-  }
-
-  componentDidMount() {
-    this.add()
-  }
-
-  componentDidUpdate() {
-    if (this.line)
-      this.props.map.removeLayer(this.line)
-    this.add()
-  }
-
-  componentWillUnmount() {
-    if (this.line)
-      this.props.map.removeLayer(this.line)
-  }
-
-  render() { return null }
-
-  add() {
-    const { color = "red", map, path } = this.props
-
-    if (!path || path.length < 2)
-      return
-  }
+    L = require("leaflet");
 }
 
 class WorldMap extends React.Component {
-
   constructor(props) {
     super(props)
-    this.forceTileReload = this.forceTileReload.bind(this)
-  }
-
-  forceTileReload() {
-    console.log("forceTileReload!")
-
-    fetch("territoryURL")
-      .then(res => res.json())
-      .then(config => {
-        if (config.url) {
-          if (this.territoryLayer) {
-            this.worldMap.removeLayer(this.territoryLayer)
-            delete this.territoryLayer
-          }
-
-          this.territoryLayer = L.tileLayer(config.url + "{z}/{x}/{y}.png?t={cachebuster}", {
-            maxZoom: 6,
-            minZoom: 1,
-            bounds: L.latLngBounds([0,0],[-256,256]),
-            noWrap: true,
-            cachebuster: function() { return Math.random(); }
-          })
-
-          this.territoryLayer.addTo(this.worldMap)
-        } else {
-          console.error("Did not receive territory URL")
-        }
-      })
-      .catch((err) => {
-        console.error(err)
-        this.setState({
-          notification: {
-            type: "error",
-            msg: "Failed to get territory URL from server",
-          }
-        })
-      })
   }
 
   componentWillUnmount() {
@@ -194,560 +16,551 @@ class WorldMap extends React.Component {
   }
 
   componentDidMount() {
-
-    this.forceTileReload()
-    this.timer = setInterval(this.forceTileReload, 15000)
-
-    const baseLayer = L.tileLayer("tiles/{z}/{x}/{y}.png", {
-      maxZoom: 6,
+    const layerOpts = {
+      maxZoom: 9,
+      maxNativeZoom: 6,
       minZoom: 1,
-      bounds: L.latLngBounds([0,0],[-256,256]),
+      bounds: L.latLngBounds([0, 0], [-256, 256]),
       noWrap: true,
-    })
+    };
 
-    const map = this.worldMap = L.map("worldmap", {
+    const baseLayer = L.tileLayer("tiles/{z}/{x}/{y}.png", layerOpts)
+
+    var map = this.worldMap = L.map("worldmap", {
       crs: L.CRS.Simple,
       layers: [baseLayer],
       zoomControl: false,
-      contextmenu: true,
-      contextmenuWidth: 140,
-      contextmenuItems: [{
-        text: "Spawn Pirate Ship",
-        callback: (evt) => this.props.onServerCommand(evt,"SpawnWorldActor \"Blueprint'/Game/Atlas/AtlasCoreBP/AI/ShipNPC_Brig.ShipNPC_Brig'\"",true)
-      }, {
-        text: "Spawn NPC Melee",
-        callback: (evt) => this.props.onServerCommand(evt,"SpawnWorldActor \"Blueprint'/Game/Atlas/Test/HumanNPC_BP_Enemy_Melee.HumanNPC_BP_Enemy_Melee'\"",true)
-      }, {
-        text: "Spawn NPC Ranged",
-        callback: (evt) => this.props.onServerCommand(evt,"SpawnWorldActor \"Blueprint'/Game/Atlas/Test/HumanNPC_BP_Enemy_Ranged.HumanNPC_BP_Enemy_Ranged'\"",true)
-      }, {
-        text: "Spawn Dire Bear",
-        callback: (evt) => this.props.onServerCommand(evt,"SpawnWorldActor \"Blueprint'/Game/Atlas/Creatures/Bear/Bear_Character_BP.Bear_Character_BP'\"",true)
-      }, {
-        text: "Command",
-        callback: (evt) => this.props.onServerCommand(evt,"",false)
-      }]
+      attributionControl: false,
     })
 
-    map.entities = {}
-    map.entities.Bed = L.layerGroup()
-    map.entities.Ship = L.layerGroup().addTo(map)
+    map._originalBounds = layerOpts.bounds;
 
+    // Add zoom control
     L.control.zoom({
-      position:'topright'
+      position: 'topright'
     }).addTo(map);
+
+    map.Islands = L.layerGroup(layerOpts);
+    map.Grid = new L.AtlasGrid({
+      xticks: config.ServersX,
+      yticks: config.ServersY
+    }).addTo(map);
+    map.IslandTerritories = L.layerGroup(layerOpts);
+    map.IslandResources = L.layerGroup(layerOpts);
+    map.Discoveries = L.layerGroup(layerOpts);
+    map.Bosses = L.layerGroup(layerOpts);
+    map.ControlPoints = L.layerGroup(layerOpts);
+    map.Ships = L.layerGroup(layerOpts).addTo(map);
+    map.Stones = L.layerGroup(layerOpts);
+    map.Treasure = L.layerGroup(layerOpts);
+    var SearchBox = L.Control.extend({
+      onAdd: function () {
+        var element = document.createElement("input");
+        element.id = "searchBox";
+        element.onchange = function (ev) {
+          var search = document.getElementById("searchBox").value.toLowerCase();
+          map.IslandResources.eachLayer(function (layer) {
+            if (search !== "" &&
+              (
+                layer.animals.find(function (element) {
+                  return element.toLowerCase().includes(search);
+                }) ||
+                layer.resources.find(function (element) {
+                  return element.toLowerCase().includes(search);
+                }))
+            )
+              layer.setStyle({
+                radius: 1.5,
+                color: "#f00",
+                opacity: 1,
+                fillOpacity: 1,
+              })
+            else
+              layer.setStyle({
+                radius: 1.5,
+                color: "#f00",
+                opacity: 0,
+                fillOpacity: 0.1,
+              })
+          })
+
+        };
+        return element;
+      }
+    });
+    (new SearchBox).addTo(map);
+    var input = document.getElementById("searchBox");
+
+    var measureControl = new L.Control.Measure({});
+    measureControl.addTo(map);
+
+    // Add Layer Control
     L.control.layers({}, {
-      Beds: map.entities.Bed,
-      Ships: map.entities.Ship,
-    }, {position: 'topright'}).addTo(map)
+      Grid: map.Grid,
+      Discoveries: map.Discoveries,
+      Treasure: map.Treasure,
+      ControlPoints: map.ControlPoints,
+      Islands: map.Islands.addTo(map),
+      Resources: map.IslandResources.addTo(map),
+      Bosses: map.Bosses,
+      Ships: map.Ships,
+      Stones: map.Stones,
+    }, {
+      position: 'topright'
+    }).addTo(map);
+
+    var stickyLayers = {};
+    map.on('overlayadd', function (e) {
+      stickyLayers[e.name] = true;
+    });
+
+    map.on('overlayremove', function (e) {
+      stickyLayers[e.name] = false;
+    });
+
+    map.on('zoomend', function () {
+      if (map.getZoom() < 5) {
+        if (!stickyLayers["Bosses"]) map.removeLayer(map.Bosses);
+        if (!stickyLayers["Stones"]) map.removeLayer(map.Stones);
+      } else {
+        if (!stickyLayers["Bosses"]) {
+          map.addLayer(map.Bosses);
+          stickyLayers["Bosses"] = false;
+        }
+
+        if (!stickyLayers["Stones"]) {
+          map.addLayer(map.Stones);
+          stickyLayers["Stones"] = false;
+        }
+      }
+    });
 
     map.setView([-128, 128], 2)
 
-    if (this.props.onContextMenu)
-      map.on("contextmenu.show", this.props.onContextMenu)
-    if (this.props.onContextMenuClose)
-      map.on("contextmenu.hide", this.props.onContextMenuClose)
+    var createIslandLabel = function (island) {
+      var label = "";
+      label += '<div id="island_' + island.IslandID + '" class="islandlabel">';
+      label += '<div class="islandlabel_icon"><img class="islandlabel_size" src="' + getIslandIcon(island) + '" width="32" height="32"/></div>';
+      label += '</div>'
+      return L.divIcon({
+        className: "islandlabel",
+        html: label
+      })
+    }
+    var createLabelIcon = function (labelClass, labelText) {
+      return L.divIcon({
+        className: labelClass,
+        html: labelText
+      })
+    }
 
-    map.on("zoomend", () => {
-        if (map.hasLayer(map.entities.Bed))
-          map.removeLayer(map.entities.Bed)
-    })
-  }
+    var CPIcon = L.icon({
+      iconUrl: 'icons/lighthouse.svg',
+      iconSize: [16, 16],
+      iconAnchor: [16, 16],
+    });
 
-  render() {
-    const { entities, commandMarker, shipPath, color, onCancelCommand } = this.props
+    var hydraIcon = L.icon({
+      iconUrl: 'icons/Hydra.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
 
-    return (
-      <div id="worldmap">
-        {Object.keys(entities).map(id => {
-          let info = entities[id]
-          if (info.ParentEntityID > 0) {
-            info = Object.assign({}, info) // copy
-            info.ServerXRelativeLocation += entities[info.ParentEntityID].ServerXRelativeLocation
-            info.ServerYRelativeLocation += entities[info.ParentEntityID].ServerYRelativeLocation
+    var yetiIcon = L.icon({
+      iconUrl: 'icons/Yeti.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    var drakeIcon = L.icon({
+      iconUrl: 'icons/Drake.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    var meanWhaleIcon = L.icon({
+      iconUrl: 'icons/MeanWhale.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    var gentleWhaleIcon = L.icon({
+      iconUrl: 'icons/GentleWhale.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    var giantSquidIcon = L.icon({
+      iconUrl: 'icons/GiantSquid.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    var stoneIcon = L.icon({
+      iconUrl: 'icons/Stone.svg',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    fetch('json/bosses.json', {
+        dataType: 'json'
+      })
+      .then(res => res.json())
+      .then(function (bosses) {
+        bosses.forEach(d => {
+          if (d.name === "Drake") {
+            var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+              icon: drakeIcon,
+            });
+          } else if (d.name === "Hydra") {
+            var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+              icon: hydraIcon,
+            });
+          } else if (d.name === "Yeti") {
+            var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+              icon: yetiIcon,
+            });
+          } else if (d.name === "GiantSquid") {
+            var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+              icon: giantSquidIcon,
+            });
+          } else if (d.name === "GentleWhale") {
+            var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+              icon: gentleWhaleIcon,
+            });
+          } else if (d.name === "MeanWhale") {
+            var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+              icon: meanWhaleIcon,
+            });
           }
 
-          return (
-            <EntityMarker
-              key={info.EntityID}
-              info={info}
-              map={this.worldMap}
-              onPopupOpen={this.props.onPopupOpen}
-              onPopupClose={this.props.onPopupClose}
-            />
-          )
+          pin.bindPopup(`${d.name}: ${d.long.toFixed(2)} / ${d.lat.toFixed(2)}`, {
+            showOnMouseOver: true,
+            autoPan: true,
+            keepInView: true,
+          });
+
+          map.Bosses.addLayer(pin)
+
+        });
+
+        var krakenSpawn = L.circle([-128, 128], {
+          radius: 1.68,
+          interactive: true,
+          color: "red",
+          fillOpacity: 0,
+        }).bindPopup("Kraken Spawn Area");
+        var krakenWall = L.circle([-128, 128], {
+          radius: 2.35,
+          interactive: true,
+          color: "blue",
+          fillOpacity: 0,
+        }).bindPopup("Kraken Border Wall");
+        map.Bosses.addLayer(krakenWall);
+        map.Bosses.addLayer(krakenSpawn);
+      })
+      .catch(error => {
+        console.log(error)
+      });
+
+    fetch('json/stones.json', {
+        dataType: 'json'
+      })
+      .then(res => res.json())
+      .then(function (stones) {
+        stones.forEach(d => {
+          var pin = new L.Marker(GPStoLeaflet(d.long, d.lat), {
+            icon: stoneIcon,
+          });
+          pin.bindPopup(`${d.name}: ${d.long.toFixed(2)} / ${d.lat.toFixed(2)}`, {
+            showOnMouseOver: true,
+            autoPan: true,
+            keepInView: true,
+          });
+
+          map.Stones.addLayer(pin)
         })
+      })
+      .catch(error => {
+        console.log(error)
+      });
+
+    fetch('json/shipPaths.json', {
+        dataType: 'json'
+      })
+      .then(res => res.json())
+      .then(function (paths) {
+        paths.forEach(path => {
+          var pathing = [];
+
+          var n = path.Nodes[0];
+          var center = [n.worldX, n.worldY];
+          var previous = rotateVector2DAroundAxis([n.worldX - n.controlPointsDistance, n.worldY], center, n.rotation);
+          var next = rotateVector2DAroundAxis([n.worldX + n.controlPointsDistance, n.worldY], center, n.rotation);
+
+          pathing.push('M', unrealToLeaflet(n.worldX, n.worldY))
+          pathing.push('C', unrealToLeafletArray(next), unrealToLeafletArray(previous), unrealToLeafletArray(center))
+
+          path.Nodes.push(path.Nodes.shift());
+          for (var i = 0; i < path.Nodes.length; i++) {
+            var n = path.Nodes[i];
+            var center = [n.worldX, n.worldY];
+            var previous = rotateVector2DAroundAxis([n.worldX - n.controlPointsDistance, n.worldY], center, n.rotation);
+            pathing.push('S', unrealToLeafletArray(previous), unrealToLeafletArray(center))
+          }
+
+          var p = L.curve(pathing, {
+            color: 'red',
+            dashArray: '10',
+          }).addTo(map);
+          map.Ships.addLayer(p)
+        })
+      })
+      .catch(error => {
+        console.log(error)
+      });
+
+    fetch('json/islands.json', {
+        dataType: 'json'
+      })
+      .then(res => res.json())
+      .then(function (islands) {
+        map._islands = islands;
+
+        for (let k in islands) {
+          var island = islands[k];
+          if (island.isControlPoint) {
+            var pin = new L.Marker(unrealToLeaflet(island.worldX, island.worldY), {
+              icon: CPIcon,
+            });
+            pin.bindPopup(`Control Point`, {
+              showOnMouseOver: true,
+              autoPan: true,
+              keepInView: true,
+            });
+
+            map.ControlPoints.addLayer(pin)
+            continue;
+          }
+
+          if (island.animals || island.resources) {
+            var circle = new IslandCircle(unrealToLeaflet(island.worldX, island.worldY), {
+              radius: 1.5,
+              color: "#f00",
+              opacity: 0,
+              fillOpacity: 0.1,
+            });
+
+            circle.animals = [];
+            circle.resources = [];
+            circle.biomes = [];
+            circle.animals = island.animals.slice();
+
+            if (island.biomes) {
+              let seen = {};
+              for (let key in island.biomes) {
+                let biome = island.biomes[key];
+                let k = biome.name + biome.temp[0] + biome.temp[1];
+                if (!seen[k] && !biome.name.includes("At Land") && !biome.name.includes("Ocean Water")) {
+                  seen[k] = 1;
+                  circle.biomes.push(island.biomes[key]);
+                }
+              }
+              circle.biomes.sort();
+            }
+
+            var html = `<b>${island.name} - ${island.id}</b><br>`;
+
+            for (let b in circle.biomes.sort()) {
+              let biome = circle.biomes[b];
+              html += `${biome.name} [Min: ${biome.temp[0].toFixed()}  Max: ${biome.temp[1].toFixed()}]<br>`;
+            }
+
+            html += `<ul class='split-ul'>`;
+            for (let resource in circle.animals.sort()) {
+              html += "<li>" + circle.animals[resource] + "</li>";
+            }
+            html += "</ul>";
+
+            if (island.resources) {
+              var resources = [];
+              for (let key in island.resources) {
+                if (key.length > 2)
+                  circle.resources.push(key);
+              }
+              circle.resources.sort();
+
+              html += "<ul class='split-ul'>";
+              circle.resources.forEach(function (v) {
+                html += "<li>" + v + " (" + island.resources[v] + ")</li>";
+              });
+              html += "</ul>";
+            }
+            circle.bindPopup(html, {
+              showOnMouseOver: true,
+              autoPan: false,
+              keepInView: true,
+              maxWidth: 560,
+            });
+            map.IslandResources.addLayer(circle);
+
+            var center = unrealToLeaflet(island.worldX, island.worldY),
+              offsets = unrealToLeaflet(island.islandWidth, island.islandHeight),
+              islandBounds = rotatePoints(center, [
+                [center[0] - (offsets[0] / 2), center[1] - (offsets[1] / 2)], // Top left
+                [center[0] - (offsets[0] / 2), center[1] + (offsets[1] / 2)], // Top right
+                [center[0] + (offsets[0] / 2), center[1] - (offsets[1] / 2)] //  Bottom left
+              ], island.rotation);
+
+            var islandImage = L.imageOverlay.rotated("islandImages/" + island.name + ".png",
+              L.latLng(islandBounds[0]),
+              L.latLng(islandBounds[1]),
+              L.latLng(islandBounds[2]), {
+                opacity: 1,
+                interactive: true
+              });
+            map.Islands.addLayer(islandImage);
+          }
+
+          if (island.treasureMapSpawnPoints) {
+            var center = unrealToLeaflet(island.worldX, island.worldY);
+            const points = rotatePoints(center,
+              island.treasureMapSpawnPoints.map(x => {
+                var coords = x.split(" ").map(x => parseFloat(x));
+                return unrealToLeaflet(island.worldX + coords[0], island.worldY + coords[1])
+              }), island.rotation);
+
+            for (var spawn in points) {
+              var circle = new IslandCircle(points[spawn], {
+                radius: .03,
+                color: "#00FF00",
+                opacity: 0.5,
+                fillOpacity: 0.5,
+              });
+              map.Treasure.addLayer(circle);
+            }
+          }
+          if (island.discoveries) {
+            for (let disco in island.discoveries) {
+              var d = island.discoveries[disco];
+              var circle = new IslandCircle(GPStoLeaflet(d.long, d.lat), {
+                radius: .05,
+                color: "#000000",
+                opacity: 0.5,
+                fillOpacity: 0.5,
+              });
+              circle.disco = d;
+              circle.bindPopup(`${d.name}: ${d.long.toFixed(2)} / ${d.lat.toFixed(2)}`, {
+                showOnMouseOver: true,
+                autoPan: false,
+                keepInView: true,
+              });
+              map.Discoveries.addLayer(circle);
+            }
+          }
         }
-        {commandMarker &&
-          <CommandMarker map={this.worldMap} latlng={commandMarker} onClose={onCancelCommand} />
-        }
-        {shipPath &&
-          <ShipPath map={this.worldMap} path={shipPath} color={color} />
-        }
-      </div>
-    )
-  }
-}
+      })
+      .catch(error => {
+        console.log(error)
+      });
 
-function serverIDparts(serverID) {
-  const buf = new ArrayBuffer(4)
-  const srv = new DataView(buf)
-  const littleEndian = true
-  srv.setUint32(0, serverID, littleEndian)
+    L.Control.MousePosition = L.Control.extend({
+      options: {
+        position: 'bottomleft',
+        separator: ' : ',
+        emptyString: 'Unavailable',
+        lngFirst: false,
+        numDigits: 5,
+        lngFormatter: undefined,
+        latFormatter: undefined,
+        prefix: ""
+      },
 
-  return [
-    srv.getUint16(0, littleEndian),
-    srv.getUint16(2, littleEndian),
-  ]
-}
+      onAdd: function (map) {
+        this._container = L.DomUtil.create('div', 'leaflet-control-mouseposition');
+        L.DomEvent.disableClickPropagation(this._container);
+        map.on('mousemove', this._onMouseMove, this);
+        this._container.innerHTML = this.options.emptyString;
+        return this._container;
+      },
 
-function calcLatLng(info) {
-  const serverX = 256 / config.ServersX
-  const serverY = 256 / config.ServersY
-  const offset = {
-    x: info.ServerID[1] * serverX,
-    y: info.ServerID[0] * serverY,
-  }
+      onRemove: function (map) {
+        map.off('mousemove', this._onMouseMove)
+      },
 
-  return [
-    -(serverY * info["ServerYRelativeLocation"] + offset.y),
-    +(serverX * info["ServerXRelativeLocation"] + offset.x),
-  ]
-}
-
-function convertToLatLng(cmd) {
-  const parts = splitCommand(cmd)
-  const info = {
-    ServerID: serverIDparts(parts.server),
-    ServerXRelativeLocation: parts.coords[0],
-    ServerYRelativeLocation: parts.coords[1],
-  }
-  return calcLatLng(info)
-}
-
-function calcServerLocation(latlng) {
-  if (latlng.lat > 0 || latlng.lng < 0)
-    return
-
-  const ServerX = 256 / config.ServersX
-  const ServerY = 256 / config.ServersY
-
-  const serverID = {
-    x: Math.floor(latlng.lng / ServerX),
-    y: Math.floor(-1 * latlng.lat / ServerY)
-  }
-
-  const buf = new ArrayBuffer(4)
-  const srv = new DataView(buf)
-  const littleEndian = true
-
-  srv.setUint16(0, serverID.y, littleEndian)
-  srv.setUint16(2, serverID.x, littleEndian)
-
-  return [
-    srv.getUint32(0, littleEndian),
-    ((+1 * latlng.lng) % ServerX) / ServerX,
-    ((-1 * latlng.lat) % ServerY) / ServerY,
-  ]
-}
-
-function locationAsString(srvloc) {
-  if (!srvloc)
-    return ""
-
-  if (!!srvloc.server)
-    return `${srvloc.server}::${srvloc.coords[0]},${srvloc.coords[1]}::`
-
-  if (srvloc.length >= 3)
-    return `${srvloc[0]}::${srvloc[1]},${srvloc[2]}::`
-
-  return ""
-}
-
-function isTribeID(tribeID) {
-  return tribeID > 1000000000 + 50000
-}
-
-function getTribeColor(tribeID) {
-  if (!tribeID)
-    return "black"
-  if (!isTribeID(tribeID))
-    return "grey"
-
-  var idx = tribeID % colors.length
-  return colors[idx]
-}
-
-function createEntityMarker(info, map) {
-  if (!icons[info.EntityType])
-    return null
-  if (!icons[info.EntityType][info.EntitySubType])
-    info.EntitySubType = "None"
-
-  const latlng = calcLatLng(info)
-  const tribeColor = getTribeColor(info.TribeID)
-
-  const options = {
-    icon: icons[info.EntityType][info.EntitySubType][tribeColor],
-    title: info.EntityName,
-  }
-
-  var infoPanel;
-  if (info.EntitySubType != "None")
-  {
-    infoPanel = 
-      `<strong>${info.EntityName}</strong><br>
-      ${info.EntityType} - ${info.EntitySubType}</br>
-      ${info.EntityID ? "EntityID " + info.EntityID : ""}</br>
-      ${info.TribeID ? "TribeID " + info.TribeID : ""}
-      <p>[${latlng[0]}, ${latlng[1]}]</p>`
-  }
-  else
-  {
-    infoPanel =
-      `<strong>${info.EntityName}</strong><br>
-      ${info.EntityType}</br>
-      ${info.EntityID ? "EntityID " + info.EntityID : ""}</br>
-      ${info.TribeID ? "TribeID " + info.TribeID : ""}
-      <p>[${latlng[0]}, ${latlng[1]}]</p>`
-  }
- 
-  const  marker=
-      L.marker(latlng, options)
-        .bindPopup(infoPanel)
-
-  marker.addTo(map.entities[info.EntityType])
-  marker.remove = function () {
-    map.entities[info.EntityType].removeLayer(marker)
-  }
-
-  marker.map = map
-  marker.entityInfo = info
-  marker.tribeColor = tribeColor
-  return marker
-}
-
-function splitCommand(text) {
-  const parts = text.split("::")
-
-  switch (parts.length) {
-    case 4:
-      return {
-        server: parts[1],
-        coords: parts[2].split(","),
-        command: parts[3],
+      _onMouseMove: function (e) {
+        var lng = L.Util.formatNum(scaleLeafletToAtlas(e.latlng.lng) - 100, 2);
+        var lat = L.Util.formatNum(100 - scaleLeafletToAtlas(-e.latlng.lat), 2);
+        var value = lng + this.options.separator + lat;
+        var prefixAndValue = this.options.prefix + ' ' + value;
+        this._container.innerHTML = prefixAndValue;
       }
+    });
 
-    case 1:
-      return { command: parts[0] }
+    L.Control.TeleportPosition = L.Control.extend({
+      options: {
+        position: 'bottomright',
+        separator: ' : ',
+        emptyString: 'Click map for TP command',
+        lngFirst: false,
+        numDigits: 5,
+        lngFormatter: undefined,
+        latFormatter: undefined,
+        prefix: ""
+      },
 
-    case 0:
-      return { command: "" }
-  }
+      onAdd: function (map) {
+        this._container = L.DomUtil.create('div', 'leaflet-control-mouseposition');
+        L.DomEvent.disableClickPropagation(this._container);
+        map.on('click', this._onMouseClick, this);
+        this._container.innerHTML = this.options.emptyString;
+        return this._container;
+      },
 
-  console.error("splitCommand: failed to parse:", { text })
-  return { command: "" }
-}
+      onRemove: function (map) {
+        map.off('click', this._onMouseClick)
+      },
 
-class CommandBar extends React.Component {
-  constructor(props) {
-    super(props)
+      _onMouseClick: function (e) {
+        var x = ccc(e.latlng.lng, -e.latlng.lat);
+        var lng = L.Util.formatNum(scaleLeafletToAtlas(e.latlng.lng) - 100, 2);
+        var lat = L.Util.formatNum(100 - scaleLeafletToAtlas(-e.latlng.lat), 2);
+        var value = `cheat TP ${x[0]} ${x[1]} ${x[2]} 10000`;
+        if (top.location != location) {
+          top.location.href = document.location.href;
+        }
+        this._container.innerHTML = value;
+      }
+    });
 
-    this.state = {
-      buffer: "",
-      historyIndex: -1,
-    }
+    L.Map.mergeOptions({
+      positionControl: false
+    });
 
-    this.handleKeyDown = this.handleKeyDown.bind(this)
-  }
+    L.Map.addInitHook(function () {
+      if (this.options.positionControl) {
+        this.positionControl = new L.Control.MousePosition();
+        this.addControl(this.positionControl);
+        this.teleportControl = new L.Control.TeleportPosition();
+        this.addControl(this.teleportControl);
+      }
+    });
 
-  componentDidUpdate() {
-    if (this.props.focused)
-      this.input.focus()
+    L.control.mousePosition = function (options) {
+      return new L.Control.MousePosition(options);
+    };
+    L.control.mousePosition().addTo(map);
+
+    L.control.teleportPosition = function (options) {
+      return new L.Control.TeleportPosition(options);
+    };
+    L.control.teleportPosition().addTo(map);
+
   }
 
   render() {
-    return (
-      <input
-        id="cmd"
-        className="CommandBar"
-        ref={el => this.input = el}
-        value={this.props.text}
-        placeholder={this.props.focused
-          ? "Enter Command (UP and DOWN for history. Hold SHIFT to maintain location. ESCAPE to clear text. ENTER to submit.)"
-          : "Command Console"
-        }
-        onChange={(e) => this.props.onChange(e.target.value)}
-        onKeyDown={this.handleKeyDown}
-        disabled={this.props.disabled}
-        onFocus={this.props.onFocus}
-        onBlur={this.props.onBlur}
-      />
-    )
-  }
-
-  handleKeyDown(event) {
-    const { history, text } = this.props
-    const { buffer, historyIndex } = this.state
-    const { onChange, onSubmit } = this.props
-
-    const next = (key, shiftPressed) => {
-      if (historyIndex + 1 >= history.length)
-        return
-
-      event.preventDefault()
-
-      const buf = historyIndex < 0 ? text : buffer
-
-      this.setState({
-        buffer: buf,
-        historyIndex: historyIndex + 1,
-      }, () => {
-        const hist = history[(history.length - 1) - (historyIndex + 1)]
-        if (!shiftPressed) {
-          onChange(hist, key)
-        } else {
-          const loc = locationAsString(splitCommand(text))
-          const cmd = splitCommand(hist).command
-          onChange(loc + cmd, key)
-        }
-      })
-    }
-
-    const prev = (key, shiftPressed) => {
-      if (historyIndex < 0)
-        return
-
-      const txt =
-        historyIndex == 0
-          ? buffer
-          : history[(history.length - 1) - (historyIndex - 1)]
-
-      this.setState({
-        historyIndex: historyIndex - 1,
-      }, () => {
-        if (historyIndex == 0) {
-          onChange(buffer, key)
-        } else {
-          const hist = history[(history.length - 1) - (historyIndex - 1)]
-          if (!shiftPressed) {
-            onChange(hist, key)
-          } else {
-            const loc = locationAsString(splitCommand(text))
-            const cmd = splitCommand(hist).command
-            onChange(loc + cmd, key)
-          }
-        }
-      })
-    }
-
-    switch (event.key) {
-      case "Tab":
-        event.preventDefault()
-        if (event.shiftKey)
-          prev(event.key, true)
-        else
-          next(event.key, true)
-        return
-
-      case "ArrowUp":
-        return next(event.key, event.shiftKey)
-
-      case "ArrowDown":
-        return prev(event.key, event.shiftKey)
-
-      case "Enter":
-        onSubmit(text)
-          .then(() => {
-            this.setState({
-              historyIndex: -1,
-            }, () => {
-              onChange("")
-            })
-          })
-          .catch(() => {
-            onChange(text)
-          })
-        return
-
-      case "Escape":
-        this.setState({
-          historyIndex: -1,
-        }, () => {
-          onChange("")
-        })
-        return
-
-      case "Shift":
-        return
-    }
-
-    this.setState({ historyIndex: -1 })
-  }
-}
-
-const listItem = (className) => (content, key) => (
-  <li className={className} key={key}>{content}</li>
-)
-
-function History(props) {
-  const classes = ["History", !props.visible ? "hidden" : ""]
-
-  if (props.history.length == 0)
-    return (
-      <div className={classes.join(" ")}>
-        <em>No history.</em>
-      </div>
-    )
-
-  return (
-    <ol className={classes.join(" ")}>
-      {props.history.map(listItem("cmd"))}
-    </ol>
-  )
-}
-
-function suggest(possibilities, text) {
-  const cmd = splitCommand(text).command
-  const args = cmd.split(" ")
-
-  if (cmd.length === 0)
-    return []
-
-  const op = args[0].toLowerCase()
-  return possibilities
-    .map(p => [p.split(" ")[0].toLowerCase(), p])
-    .filter(([cmd, p]) => cmd.startsWith(op))
-    .sort((a, b) => a[0].length < b[0].length)
-    .map(x => x[1])
-}
-
-function Suggestions(props) {
-  // const classes = ["History", !props.visible ? "hidden" : ""]
-  const classes = ["Suggestions"]
-
-  return props.suggestions.length === 0
-    ? (
-      <div className={classes.join(" ")}>
-        <em>No matches.</em>
-      </div>
-    )
-    : (
-      <ol reversed className={classes.join(" ")}>
-        {props.suggestions.map(listItem("suggestion"))}
-      </ol>
-    )
-}
-
-class CommandConsole extends React.Component {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      history: [],
-      suggestions: [],
-      historyOpen: false,
-      sending: false,
-    }
-
-    this.handleCommandBarChange = this.handleCommandBarChange.bind(this)
-    this.handleCommandBarSubmit = this.handleCommandBarSubmit.bind(this)
-  }
-
-  render() {
-    const { history, historyOpen, sending, suggestions } = this.state
-
-    const showHistory =
-      historyOpen || splitCommand(this.props.text).command.length === 0
-
-    return (
-      <div id="cmdbar" className="CommandConsole">
-        {showHistory ?
-          <History
-            visible={this.props.focused}
-            history={history}
-          />
-          :
-          <Suggestions
-            visible={this.props.focused}
-            suggestions={suggestions}
-          />
-        }
-        <CommandBar
-          text={this.props.text || ""}
-          history={showHistory ? history : suggestions.map(s => s.split(" ")[0])}
-          autocomplete={!showHistory}
-          disabled={sending}
-          focused={this.props.focused}
-          onBlur={this.props.onBlur}
-          onChange={this.handleCommandBarChange}
-          onFocus={this.props.onFocus}
-          onSubmit={this.handleCommandBarSubmit}
-        />
-      </div>
-    )
-  }
-
-  handleCommandBarChange(text, keyPressed) {
-    switch (keyPressed) {
-      case "ArrowUp":
-      case "ArrowDown":
-      case "Tab":
-        const historyOpen =
-          this.state.historyOpen || splitCommand(this.props.text).command.length === 0
-
-        this.props.onChange(text)
-        this.setState({ historyOpen })
-        return
-    }
-
-    this.setState({
-      historyOpen: false,
-      suggestions: suggest(possibilities, text)
-    }, () => {
-      this.props.onChange(text)
-    })
-  }
-
-  handleCommandBarSubmit(cmd) {
-    const { history } = this.state
-
-    this.setState({ sending: true })
-
-    return this.props.onSubmit(cmd)
-      .then(() => {
-        this.setState({
-          sending: false,
-          history: [...history, cmd],
-        })
-      }, () => {
-        this.setState({ sending: false })
-      })
-  }
-}
-
-class Legend extends React.Component {
-
-  constructor(props) {
-    super(props)
-  }
-
-  render() {
-    
-    const { entities, tribes } = this.props
-
-    return (
-    <div id="Legend" className="info legend">
-      {Object.keys(tribes).map(id => {return (<div key={id}><i style={{background:getTribeColor(id)}}></i>{tribes[id].TribeName}<br/></div>)})}
-      <div key={'none'}><i style={{background:'grey'}}></i>{'non-tribe'}<br/></div>
-    </div>);
-  }
-}
-
-class TitleBar extends React.Component {
-  render() {
-    return (
-      <div className="titlebar" id="TitleBar"><img src="atlaslogo128.png" className="atlastitlebaricon" /></div>
+    return ( <
+      div id = "worldmap" > < /div>
     )
   }
 }
@@ -760,292 +573,335 @@ class App extends React.Component {
       notification: {},
       entities: {},
       tribes: {},
-      command: "",
-      commandMarker: null,
-      shipPath: [],
-      activeTribeColor: "",
-      consoleFocused: false,
       sending: false,
-      commandConsoleEnabled: false
     }
-
-    this.getData = this.getData.bind(this)
-    this.checkCommandConsoleEnabled = this.checkCommandConsoleEnabled.bind(this);
-    this.poll = this.poll.bind(this)
-
-    this.handleWorldMapCancelCommand = this.handleWorldMapCancelCommand.bind(this)
-    this.handleWorldMapContextMenu = this.handleWorldMapContextMenu.bind(this)
-    this.handleWorldMapContextMenuClose = this.handleWorldMapContextMenuClose.bind(this)
-    this.handleServerCommand = this.handleServerCommand.bind(this)
-
-    this.handleWorldMapPopupClose = this.handleWorldMapPopupClose.bind(this)
-    this.handleWorldMapPopupOpen = this.handleWorldMapPopupOpen.bind(this)
-
-    this.handleCommandConsoleChange = this.handleCommandConsoleChange.bind(this)
-    this.handleCommandConsoleSubmit = this.handleCommandConsoleSubmit.bind(this)
-    this.handleCommandConsoleBlur = this.handleCommandConsoleBlur.bind(this)
-    this.handleCommandConsoleFocus = this.handleCommandConsoleFocus.bind(this)
-  }
-
-  componentDidMount() {
-    if (window) {
-      window.onkeydown = (evt) => {
-        if (evt.key !== '`')
-          return
-
-        if (this.state.consoleFocused)
-          return
-
-        evt.preventDefault()
-        this.setState({ consoleFocused: true })
-      }
-    }
-
-    this.getData()
-      .then(this.poll)
-
-    this.checkCommandConsoleEnabled()
-  }
-
-  componentWillUnmount() {
-    clearTimeout(this.pollHandle)
   }
 
   render() {
     const {
-      activeTribeColor, shipPath,
-      command, commandMarker, consoleFocused, entities,
-      notification, tribes,  commandConsoleEnabled,
+      notification
     } = this.state
-
-    let CommandConsoleComponent;
-    if (commandConsoleEnabled) {
-      CommandConsoleComponent = <CommandConsole
-          text={command}
-          focused={consoleFocused}
-          onChange={this.handleCommandConsoleChange}
-          onSubmit={this.handleCommandConsoleSubmit}
-          onBlur={this.handleCommandConsoleBlur}
-          onFocus={this.handleCommandConsoleFocus}
-        />;
-    } else {
-      CommandConsoleComponent = null
-    }
-
-    return (
-      <div className="App">
-        <TitleBar />
-        <WorldMap
-          entities={entities}
-          commandMarker={commandMarker}
-          shipPath={shipPath}
-          color={activeTribeColor}
-          onContextMenu={this.handleWorldMapContextMenu}
-          onContextMenuClose={this.handleWorldMapContextMenuClose}
-          onServerCommand={this.handleServerCommand}
-          onCancelCommand={this.handleWorldMapCancelCommand}
-          onPopupOpen={this.handleWorldMapPopupOpen}
-          onPopupClose={this.handleWorldMapPopupClose}
-        />
-        <div className={"notification " + (notification.type || "hidden")}>
-          {notification.msg}
-          <button className="close" onClick={() => this.setState({ notification: {} })}>Dismiss</button>
-        </div>
-        {CommandConsoleComponent}
-        <Legend entities={entities} tribes={tribes}/>
-      </div>
+    return ( <
+      div className = "App" >
+      <
+      WorldMap / >
+      <
+      div className = {
+        "notification " + (notification.type || "hidden")
+      } > {
+        notification.msg
+      } <
+      button className = "close"
+      onClick = {
+        () => this.setState({
+          notification: {}
+        })
+      } > Dismiss < /button> < /
+      div > <
+      /div>
     )
-  }
-
-  getData() {
-    var pTribes = fetch("gettribes")
-      .then(res => res.json())
-      .then(tribes => {
-        this.setState({ tribes })
-      })
-      .catch((err) => {
-        console.error(err)
-        this.setState({
-          notification: {
-            type: "error",
-            msg: "Failed to get latest data from server",
-          }
-        })
-      })
-
-    var pData = fetch("getdata")
-      .then(res => res.json())
-      .then(entities => {
-        // console.log({ entities })
-        this.setState({ entities })
-      })
-      .catch((err) => {
-        console.error(err)
-        this.setState({
-          notification: {
-            type: "error",
-            msg: "Failed to get latest data from server",
-          }
-        })
-      })
-
-      return Promise.all([pTribes,pData])
-  }
-
-  checkCommandConsoleEnabled() {
-    fetch("command", { method: "POST", body: ""})
-      .then(res => { 
-        console.log(res);
-        if (res.status == 405) {
-          this.setState({commandConsoleEnabled: false});
-        } else {
-          this.setState({commandConsoleEnabled: true});
-        }
-      });
-  }
-
-  poll() {
-    clearTimeout(this.pollHandle)
-
-    this.pollHandle =
-      setTimeout(
-        () => this.getData().then(this.poll),
-        this.props.refresh
-      )
-  }
-
-  handleCommandConsoleChange(command) {
-    let commandMarker = null
-    if (command.indexOf("::") !== -1)
-      commandMarker = convertToLatLng(command)
-
-    this.setState({
-      command,
-      commandMarker,
-    })
-  }
-
-  handleCommandConsoleBlur() {
-    this.setState({ consoleFocused: false })
-  }
-
-  handleCommandConsoleFocus() {
-    this.setState({ consoleFocused: true })
-  }
-
-  handleCommandConsoleSubmit(cmd) {
-    this.setState({
-      sending: true,
-      notification: {
-        type: "info",
-        msg: "Sending...",
-      }
-    })
-
-    return fetch("command", {
-      method: "POST",
-      body: cmd,
-    })
-      .then(res => {
-        if (!res.ok) {
-          this.setState({
-            sending: false,
-            notification: {
-              type: "error",
-              msg: "Failed to execute command",
-            },
-          })
-          throw res
-        }
-
-        this.setState({
-          sending: false,
-          commandMarker: null,
-          notification: {},
-          history: [...history, cmd],
-        })
-      })
-  }
-
-  handleWorldMapCancelCommand() {
-    this.setState({ commandMarker: null })
-  }
-
-  handleWorldMapContextMenu(evt) {
-    const srvloc = calcServerLocation(evt.latlng)
-    const loc = locationAsString(srvloc)
-    const text = splitCommand(this.state.command).command
-
-    this.setState({
-      command: "Map::" + loc + text,
-      commandMarker: evt.latlng,
-      consoleFocused: true,
-    })
-  }
-
-  handleWorldMapContextMenuClose(evt) {
-    this.setState({commandMarker: null});
-  }
-
-  handleServerCommand(evt,cmd,bAutoSubmit) {
-    const srvloc = calcServerLocation(evt.latlng)
-    const loc = locationAsString(srvloc)
-    
-    let text = splitCommand(this.state.command).command
-    if (cmd)
-      text = cmd
-
-    if (bAutoSubmit) {
-      this.handleCommandConsoleSubmit("Map::" + loc + text)
-      this.setState({
-        command: "",
-        commandMarker: null,
-        consoleFocused: false,
-      })
-    } else {
-      this.setState({
-        command: "Map::" + loc + text,
-        commandMarker: evt.latlng,
-        consoleFocused: true,
-      })
-    }
-  
-  }
-
-  handleWorldMapPopupClose(evt) {
-    if (!evt || !evt.sourceTarget)
-      return
-
-    const info = evt.sourceTarget.entityInfo
-
-    if (!info || info.EntityType !== "Ship")
-      return
-
-    this.setState({ shipPath: [] })
-  }
-
-  handleWorldMapPopupOpen(evt) {
-    if (!evt || !evt.sourceTarget)
-      return
-
-    const info = evt.sourceTarget.entityInfo
-
-    if (!info || info.EntityType !== "Ship" || !info.EntityID)
-      return
-
-    fetch(`travels?id=${info.EntityID}`)
-      .then(res => res.json())
-      .then(shipPath => this.setState({
-        shipPath,
-        activeTribeColor: getTribeColor(info.TribeID),
-      }, () => {
-        // HACK: for some reason the popup closes after setState, so force it to reopen
-        evt.popup.openOn(evt.sourceTarget.map)
-      }))
   }
 }
 
-ReactDOM.render(
-  <App refresh={5 * 1000 /* 5 seconds */} />,
+function scaleAtlasToLeaflet(e) {
+  return (e + 100) * (1.28);
+}
+
+function scaleLeafletToAtlas(e) {
+  return (e / 1.28);
+}
+
+function GPStoLeaflet(x, y) {
+  var long = (y - 100) * 1.28,
+    lat = (100 + x) * 1.28;
+
+  return [long, lat];
+}
+
+function unrealToLeaflet(x, y) {
+  const unrealx = config.GridSize * config.ServersX;
+  const unrealy = config.GridSize * config.ServersY;
+  var long = -((y / unrealy) * 256),
+    lat = ((x / unrealx) * 256);
+  return [long, lat];
+}
+
+function rotateVector2DAroundAxis(vec, axis, ang) {
+  ang = ang * (Math.PI / 180);
+  var cos = Math.cos(ang);
+  var sin = Math.sin(ang);
+
+  // Translate to axis
+  vec[0] -= axis[0];
+  vec[1] -= axis[1];
+
+  var r = new Array(vec[0] * cos - vec[1] * sin, vec[0] * sin + vec[1] * cos);
+
+  // Translate back to world
+  r[0] += axis[0];
+  r[1] += axis[1];
+
+  return r;
+}
+
+function rotatePoints(center, points, yaw) {
+  var res = []
+  var angle = yaw * (Math.PI / 180)
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i]
+    var p2 = [p[0] - center[0], p[1] - center[1]]
+    var p3 = [Math.cos(angle) * p2[0] - Math.sin(angle) * p2[1], Math.sin(angle) * p2[0] + Math.cos(angle) * p2[1]]
+    var p4 = [p3[0] + center[0], p3[1] + center[1]]
+    res.push(p4)
+  }
+  return res
+}
+
+function unrealToLeafletArray(a) {
+  return unrealToLeaflet(a[0], a[1]);
+}
+
+function constraint(value, minRange, maxRange, minVal, maxVal) {
+  return (((value - minVal) / (maxVal - minVal)) * (maxRange - minRange) + minRange);
+}
+
+function ccc(x, y) {
+  var precision = (256 / config.ServersX);
+  var gridXName = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+  var gridX = gridXName[Math.floor(x / precision)];
+  var gridY = Math.floor(y / precision) + 1;
+  var localX = constraint(x % precision, -700000, 700000, 0, precision).toFixed(0);
+  var localY = constraint(y % precision, -700000, 700000, 0, precision).toFixed(0);
+
+  return [gridX + gridY, localX, localY];
+}
+
+// Get local URI for requests
+function getLocalURI() {
+  var loc = window.location,
+    new_uri;
+  if (loc.protocol === "https:") {
+    new_uri = "wss:";
+  } else {
+    new_uri = "ws:";
+  }
+  new_uri += "//" + loc.host;
+  return new_uri;
+}
+
+ReactDOM.render( <
+  App refresh = {
+    5 * 1000 /* 5 seconds */
+  }
+  />,
   document.getElementById("app")
 )
+
+class QElement {
+  constructor(element, priority) {
+    this.element = element;
+    this.priority = priority;
+  }
+}
+class PriorityQueue {
+  constructor() {
+    this.items = [];
+  }
+  enqueue(element, priority) {
+    var qElement = new QElement(element, priority);
+    var contain = false;
+    for (var i = 0; i < this.items.length; i++) {
+      if (this.items[i].priority > qElement.priority) {
+        this.items.splice(i, 0, qElement);
+        contain = true;
+        break;
+      }
+    }
+    if (!contain) {
+      this.items.push(qElement);
+    }
+  }
+  dequeue() {
+    return this.items.shift();
+  }
+  front() {
+    return this.items[0];
+  }
+  isEmpty() {
+    return this.items.length == 0;
+  }
+  clear() {
+    this.items = []
+  }
+}
+
+function formatSeconds(InTime) {
+  var Days = 0
+  var Hours = Math.floor(InTime / 3600);
+  var Minutes = Math.floor((InTime % 3600) / 60);
+  var Seconds = Math.floor((InTime % 3600) % 60);
+  if (Hours >= 24) {
+    Days = Math.floor(Hours / 24);
+    Hours = Hours - (Days * 24)
+  }
+  if (Days > 0)
+    return Days + "d:" + Hours + "h:" + Minutes + "n:" + Seconds + "s";
+  else if (Hours > 0)
+    return Hours + "h:" + Minutes + "m:" + Seconds + "s";
+  else if (Minutes > 0)
+    return Minutes + "m:" + Seconds + "s";
+  else
+    return Seconds + "s";
+}
+
+function getWarState(Island) {
+  var now = Math.floor(Date.now() / 1000)
+  if (now >= Island.WarStartUTC && now < Island.WarEndUTC) {
+    Island.bWar = true;
+    Island.WarNextUpdateSec = Island.WarEndUTC - now;
+    return "AT WAR! ENDS IN " + formatSeconds(Island.WarNextUpdateSec)
+  } else if (now < Island.WarStartUTC) {
+    Island.bWar = false;
+    Island.WarNextUpdateSec = Island.WarStartUTC - now;
+    return "WAR BEGINS IN " + formatSeconds(Island.WarNextUpdateSec)
+  } else if (now < Island.WarEndUTC + 5 * 24 * 3600) {
+    Island.bWar = false;
+    Island.WarNextUpdateSec = Island.WarEndUTC + 5 * 24 * 3600 - now;
+    return "CAN DECLARE WAR IN " + formatSeconds(Island.WarNextUpdateSec)
+  } else {
+    Island.bWar = false;
+    Island.WarNextUpdateSec = Number.MAX_SAFE_INTEGER;
+    return "War can be declared on this settlement."
+  }
+}
+
+function getPeaceState(Island) {
+  var now = new Date();
+  var CombatStartSeconds = Island.CombatPhaseStartTime;
+  var CombatEndSeconds = (CombatStartSeconds + 32400) % 86400;
+  var CurrentDaySeconds = (3600 * now.getUTCHours()) + (60 * now.getUTCMinutes()) + now.getUTCSeconds();
+  if (CombatEndSeconds > CombatStartSeconds) {
+    if (CurrentDaySeconds < CombatStartSeconds) {
+      Island.bCombat = false;
+      Island.CombatNextUpdateSec = CombatStartSeconds - CurrentDaySeconds;
+      return "In Peace Phase. " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else if (CurrentDaySeconds >= CombatStartSeconds && CurrentDaySeconds < CombatEndSeconds) {
+      Island.bCombat = true;
+      Island.CombatNextUpdateSec = CombatEndSeconds - CurrentDaySeconds;
+      return "In Combat Phase! " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else {
+      Island.bCombat = false;
+      Island.CombatNextUpdateSec = 86400 - CurrentDaySeconds + CombatStartSeconds
+      return "In Peace Phase." + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    }
+  } else {
+    if (CurrentDaySeconds >= CombatStartSeconds) {
+      Island.bCombat = true;
+      Island.CombatNextUpdateSec = 86400 - CurrentDaySeconds + CombatEndSeconds;
+      return "In Combat Phase! " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else if (CurrentDaySeconds < CombatEndSeconds) {
+      Island.bCombat = true;
+      Island.CombatNextUpdateSec = CombatEndSeconds - CurrentDaySeconds;
+      return "In Combat Phase! " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else {
+      Island.bCombat = false;
+      Island.CombatNextUpdateSec = CombatStartSeconds - CurrentDaySeconds;
+      return "In Peace Phase. " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    }
+  }
+}
+
+function getIslandIcon(Island) {
+  if (Island.bWar || Island.bCombat)
+    return "HUD_War_Icon.png";
+  else
+    return "HUD_Peace_Icon.png";
+}
+var GlobalSelectedIsland = null;
+var GlobalPriortyQueue = new PriorityQueue();
+setInterval(updateIsland, 1000)
+
+function updateIsland() {
+  while (!GlobalPriortyQueue.isEmpty()) {
+    var now = Math.floor(Date.now() / 1000);
+    if (GlobalPriortyQueue.front().priority > now)
+      break;
+    var Island = GlobalPriortyQueue.dequeue().element;
+    getWarState(Island);
+    getPeaceState(Island);
+    var el = document.getElementById("island_" + Island.IslandID);
+    if (el != null) {
+      var img = el.getElementsByClassName("islandlabel_size")[0];
+      img.src = getIslandIcon(Island);
+    }
+    var nextUpdate = Island.CombatNextUpdateSec;
+    if (Island.WarNextUpdateSec < nextUpdate)
+      nextUpdate = Island.WarNextUpdateSec;
+    GlobalPriortyQueue.enqueue(Island, now + nextUpdate + 1);
+  }
+  if (GlobalSelectedIsland != null) {
+    var phase = document.getElementById("pop_up_phase")
+    if (phase != null)
+      phase.innerHTML = getPeaceState(GlobalSelectedIsland)
+    var war = document.getElementById("pop_up_war")
+    if (war != null)
+      war.innerHTML = getWarState(GlobalSelectedIsland)
+  }
+}
+class IslandCircle extends L.Circle {
+  constructor(latlng, options) {
+    super(latlng, options)
+    this.Island = null
+    this.bindPopup = this.bindPopup.bind(this)
+    this._popupMouseOut = this._popupMouseOut.bind(this)
+    this._getParent = this._getParent.bind(this)
+  }
+  bindPopup(htmlContent, options) {
+    if (options && options.showOnMouseOver) {
+      L.Marker.prototype.bindPopup.apply(this, [htmlContent, options]);
+      this.off("click", this.openPopup, this);
+      this.on("mouseover", function (e) {
+        var target = e.originalEvent.fromElement || e.originalEvent.relatedTarget;
+        var parent = this._getParent(target, "leaflet-popup");
+        if (parent == this._popup._container)
+          return true;
+        GlobalSelectedIsland = this.Island
+        this.openPopup();
+      }, this);
+      this.on("mouseout", function (e) {
+        var target = e.originalEvent.toElement || e.originalEvent.relatedTarget;
+        if (this._getParent(target, "leaflet-popup")) {
+          L.DomEvent.on(this._popup._container, "mouseout", this._popupMouseOut, this);
+          return true;
+        }
+        this.closePopup();
+        GlobalSelectedIsland = null
+      }, this);
+    }
+  }
+  _popupMouseOut(e) {
+    L.DomEvent.off(this._popup, "mouseout", this._popupMouseOut, this);
+    var target = e.toElement || e.relatedTarget;
+    if (this._getParent(target, "leaflet-popup"))
+      return true;
+    if (target == this._path)
+      return true;
+    this.closePopup();
+    GlobalSelectedIsland = null;
+  }
+  _getParent(element, className) {
+    if (element == null)
+      return false;
+    var parent = element.parentNode;
+    while (parent != null) {
+      if (parent.className && L.DomUtil.hasClass(parent, className))
+        return parent;
+      parent = parent.parentNode;
+    }
+    return false;
+  }
+}
+
+function escapeHTML(unsafe_str) {
+  return unsafe_str.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/\"/g, '"').replace(/\'/g, '\'');
+}
