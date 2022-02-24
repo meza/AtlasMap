@@ -1,50 +1,41 @@
 package atlasmapserver
 
 import (
+	"context"
 	"fmt"
-	"log"
 
+	"github.com/rs/zerolog/log"
+
+	"github.com/antihax/AtlasMap/atlasmapserver/eventbroker"
 	"github.com/antihax/AtlasMap/internal/atlasdb"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 
 	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/go-redis/redis"
 )
 
 // AtlasMapServer provides administrative services to an Atlas Cluster over http
 type AtlasMapServer struct {
-	redisClient  *redis.Client
-	gameData     map[string]EntityInfo
-	gameDataLock sync.RWMutex
+	// Map steamID to playerID as redis does not hold this in a useful manner
+	mapSteamIDPlayerID sync.Map
+	mapPlayerIDSteamID sync.Map
 
-	tribeData     map[string]map[string]string
-	tribeDataLock sync.RWMutex
-
-	playerData     map[string]map[string]string
-	playerDataLock sync.RWMutex
-
-	steamData     map[string]string
-	steamDataLock sync.RWMutex
+	broker *eventbroker.EventBroker
 
 	config *Configuration
+	router *mux.Router
+	db     *atlasdb.AtlasDB
 
-	db *atlasdb.AtlasDB
-
+	// Session store and CSRF protection
 	store *sessions.FilesystemStore
 }
 
 // NewAtlasMapServer creates a new server
 func NewAtlasMapServer() *AtlasMapServer {
 	return &AtlasMapServer{
-		gameData:   make(map[string]EntityInfo),
-		tribeData:  make(map[string]map[string]string),
-		playerData: make(map[string]map[string]string),
-		steamData:  make(map[string]string),
+		router: mux.NewRouter(),
 	}
 }
 
@@ -72,27 +63,14 @@ type ServerLocation struct {
 
 // Run starts the server processing
 func (s *AtlasMapServer) Run() error {
-
 	// Load configuration from environment
 	if err := s.loadConfig(); err != nil {
 		return err
 	}
 
+	// Setup session store
 	s.store = sessions.NewFilesystemStore(s.config.SessionStore, []byte(s.config.SessionKey))
-	/*
-		// Setup redis connection
-		s.redisClient = redis.NewClient(&redis.Options{
-			Addr:     s.config.RedisAddress,
-			Password: s.config.RedisPassword,
-			DB:       s.config.RedisDB,
-		})
-
-		// Test connection
-		_, err := s.redisClient.Ping().Result()
-		if err != nil {
-			return err
-		}*/
-
+	s.store.MaxAge(2400)
 	// Setup our DB pool
 	db, err := atlasdb.NewAtlasDB(
 		s.config.AtlasRedisAddress,
@@ -104,146 +82,51 @@ func (s *AtlasMapServer) Run() error {
 	}
 	s.db = db
 
+	s.broker = eventbroker.NewEventBroker(db)
+
 	// Poll the database for data
 	go s.fetch()
 
-	// Setup handlers
-	http.Handle("/gettribes", ourMiddleware(http.HandlerFunc(s.getTribes)))
-	http.Handle("/getdata", ourMiddleware(http.HandlerFunc(s.getData)))
-	http.Handle("/travels", ourMiddleware(http.HandlerFunc(s.getPathTravelled)))
-	http.Handle("/territoryURL", ourMiddleware(http.HandlerFunc(s.getTerritoryURL)))
-	http.Handle("/", http.FileServer(http.Dir(s.config.StaticDir)))
+	// API Endpoints
+	s.apiRouter(s.router.PathPrefix("/api/"))
+	s.sessionRouter(s.router.PathPrefix("/s/"))
 
-	http.Handle("/login", ourMiddleware(http.HandlerFunc(s.loginHandler)))
-	http.Handle("/logout", ourMiddleware(http.HandlerFunc(s.logoutHandler)))
-	http.Handle("/account", ourMiddleware(http.HandlerFunc(s.accountHandler)))
+	// Login endpoints
+	s.router.HandleFunc("/login", s.loginHandler)
+	s.router.HandleFunc("/logout", s.logoutHandler)
 
-	// Don't serve command handler if disabled
-	if !s.config.DisableCommands {
-		http.HandleFunc("/command", s.sendCommand)
-	}
+	// Serve static content
+	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir(s.config.StaticDir)))
 
 	endpoint := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
-	log.Println("Listening on ", endpoint)
-	return http.ListenAndServe(endpoint, nil)
+	log.Info().Msgf("Listening on %s", endpoint)
+	return http.ListenAndServe(endpoint, s.router)
 }
 
 func (s *AtlasMapServer) fetch() {
-	kidsWithBadParents := make(map[string]bool)
+
 	throttle := time.NewTicker(time.Duration(s.config.FetchRateInSeconds) * time.Second)
 
 	for {
-		entities := make(map[string]EntityInfo)
-
-		// Get all tribe information
-		tribes, err := s.db.GetAllTribes()
+		// Get all players and update maps to include new players
+		playerIDList, err := s.db.GetAllPlayerID(context.Background())
 		if err != nil {
-			log.Println(err)
+			log.Error().Err(err).Msg("db.GetAllPlayerID")
 			continue
 		}
-
-		s.tribeDataLock.Lock()
-		s.tribeData = tribes
-		s.tribeDataLock.Unlock()
-
-		// Get the steamID=>playerID lookup
-		steamData, err := s.db.GetReverseSteamIDMap()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		s.steamDataLock.Lock()
-		s.steamData = steamData
-		s.steamDataLock.Unlock()
-
-		// Get player data
-		playerData, err := s.db.GetAllPlayers()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		s.playerDataLock.Lock()
-		s.playerData = playerData
-		s.playerDataLock.Unlock()
-
-		// Get all beds and ships
-		e, err := s.db.GetAllEntities()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		for _, record := range e {
-			info := newEntityInfo(record)
-			entities[info.EntityID] = *info
-		}
-
-		// sanity check entity data, e.g. any missing parent ids?
-		for k, v := range entities {
-			if v.ParentEntityID != "0" {
-				if _, parentFound := entities[v.ParentEntityID]; !parentFound {
-					if _, dontSpamLog := kidsWithBadParents[k]; !dontSpamLog {
-						kidsWithBadParents[k] = true
-					}
-					delete(entities, k)
+		for _, playerID := range playerIDList {
+			if _, ok := s.mapPlayerIDSteamID.Load(playerID); !ok {
+				// fetch from redis
+				steamID, err := s.db.GetSteamIDFromPlayerID(context.Background(), playerID)
+				if err != nil {
+					log.Error().Err(err).Msg("db.GetSteamIDFromPlayerID")
+					continue
 				}
+				s.mapPlayerIDSteamID.Store(playerID, steamID)
+				s.mapSteamIDPlayerID.Store(steamID, playerID)
 			}
 		}
-		s.gameDataLock.Lock()
-		s.gameData = entities
-		s.gameDataLock.Unlock()
 
 		<-throttle.C
 	}
-}
-
-// newEntityInfo transforms a Key-Value record into a new EntityInfo object.
-func newEntityInfo(record map[string]string) *EntityInfo {
-	var info EntityInfo
-	info.EntityID = record["EntityID"]
-	info.ParentEntityID = record["ParentEntityID"]
-	info.EntityName = record["EntityName"]
-	info.EntityType = record["EntityType"]
-	info.ServerXRelativeLocation, _ = strconv.ParseFloat(record["ServerXRelativeLocation"], 64)
-	info.ServerYRelativeLocation, _ = strconv.ParseFloat(record["ServerYRelativeLocation"], 64)
-	info.LastUpdatedDBAt, _ = strconv.ParseUint(record["LastUpdatedDBAt"], 10, 64)
-	info.NextAllowedUseTime, _ = strconv.ParseUint(record["NextAllowedUseTime"], 10, 64)
-
-	var ok bool
-	var tmpTribeID string
-	if tmpTribeID, ok = record["TribeID"]; !ok {
-		tmpTribeID = record["TribeId"]
-	}
-	info.TribeID = tmpTribeID
-
-	var tmpServerID string
-	if tmpServerID, ok = record["ServerID"]; !ok {
-		tmpServerID = record["ServerId"]
-	}
-	info.ServerID, _ = atlasdb.ServerID(tmpServerID)
-
-	// convert entity class to a subtype
-	var tmpEntityClass string
-	if tmpEntityClass, ok = record["EntityClass"]; !ok {
-		tmpEntityClass = "none"
-	}
-	tmpEntityClass = strings.ToLower(tmpEntityClass)
-	if strings.Contains(tmpEntityClass, "none") {
-		info.EntitySubType = "None"
-	} else if strings.Contains(tmpEntityClass, "brigantine") {
-		info.EntitySubType = "Brigantine"
-	} else if strings.Contains(tmpEntityClass, "dinghy") {
-		info.EntitySubType = "Dingy"
-	} else if strings.Contains(tmpEntityClass, "raft") {
-		info.EntitySubType = "Raft"
-	} else if strings.Contains(tmpEntityClass, "sloop") {
-		info.EntitySubType = "Sloop"
-	} else if strings.Contains(tmpEntityClass, "schooner") {
-		info.EntitySubType = "Schooner"
-	} else if strings.Contains(tmpEntityClass, "galleon") {
-		info.EntitySubType = "Galleon"
-	} else {
-		info.EntitySubType = "None"
-	}
-
-	return &info
 }

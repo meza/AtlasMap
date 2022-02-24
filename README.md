@@ -24,7 +24,7 @@ The following environment variables can be set to reconfigure the service:
 
 `SESSION_PATH` location of session store files. default ./store
 
-`SESSION_KEY` Session encryption key *MUST BE SET ON PRODUCTION*. default is random.
+`SESSION_KEY` Session encryption key *MUST BE SET ON PRODUCTION* and should be a 32 byte value. default is random.
 
 `ATLAS_REDIS_ADDRESS` Atlas Redis Address. default is localhost:6379.
 

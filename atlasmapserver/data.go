@@ -2,36 +2,18 @@ package atlasmapserver
 
 import "errors"
 
-func (s *AtlasMapServer) getPlayerIDFromSteamID(steamID string) (string, error) {
-	s.steamDataLock.RLock()
-	playerID, ok := s.steamData[steamID]
-	s.steamDataLock.RUnlock()
-	if !ok {
-		return "", errors.New("No pathfinder found for SteamID")
+func (s *AtlasMapServer) GetPlayerIDFromSteamID(steamID string) (int64, error) {
+	playerID, ok := s.mapSteamIDPlayerID.Load(steamID)
+	if ok {
+		return playerID.(int64), nil
 	}
-	return playerID, nil
+	return 0, errors.New("cannot locate playerID")
 }
 
-func (s *AtlasMapServer) getPlayerDataFromSteamID(steamID string) (map[string]string, error) {
-	playerID, err := s.getPlayerIDFromSteamID(steamID)
-	if err != nil {
-		return nil, err
+func (s *AtlasMapServer) GetSteamIDFromPlayerID(playerID int64) (string, error) {
+	steamID, ok := s.mapSteamIDPlayerID.Load(playerID)
+	if ok {
+		return steamID.(string), nil
 	}
-	s.playerDataLock.RLock()
-	defer s.playerDataLock.RUnlock()
-	return s.playerData[playerID], nil
-}
-
-func (s *AtlasMapServer) getTribeDataFromSteamID(steamID string) (map[string]string, error) {
-	playerData, err := s.getPlayerDataFromSteamID(steamID)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := playerData["tribeID"]; ok {
-		s.tribeDataLock.RLock()
-		defer s.tribeDataLock.RUnlock()
-		return s.tribeData[playerData["tribeID"]], nil
-	}
-	return nil, errors.New("No tribe information pathfinder")
+	return "", errors.New("cannot locate steamID")
 }

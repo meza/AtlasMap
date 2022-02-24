@@ -1,86 +1,109 @@
 package atlasmapserver
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
+	"strconv"
 
-	"github.com/prometheus/common/log"
+	"github.com/gorilla/sessions"
+	"github.com/rs/zerolog/log"
 	"github.com/solovev/steam_go"
 )
 
+type contextKey int
+
+const (
+	SessionKey contextKey = iota
+)
+
 func (s *AtlasMapServer) logoutHandler(w http.ResponseWriter, r *http.Request) {
-	session, err := s.store.Get(r, "atlas-session")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Error(err)
-		return
+	session, ok := r.Context().Value(SessionKey).(*sessions.Session)
+	if ok {
+		// Force deletion of the cookie and session
+		session.Options.MaxAge = -1
+
+		// Save changes
+		if err := session.Save(r, w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Error().Err(err).Msg("save session")
+			return
+		}
+	} else {
+		// Delete cookie if we can't read the session
+		s.clearSessionCookie(w)
 	}
 
-	// Force deletion of the cookie and session
-	session.Options.MaxAge = -1
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+}
 
-	// Save changes
-	if err := session.Save(r, w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Error(err)
-		return
-	}
-
-	http.Redirect(w, r, "/", 301)
+func (s *AtlasMapServer) clearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: "session", MaxAge: -1, Path: "/"})
 }
 
 func (s *AtlasMapServer) loginHandler(w http.ResponseWriter, r *http.Request) {
 	opID := steam_go.NewOpenId(r)
 	switch opID.Mode() {
 	case "":
-		http.Redirect(w, r, opID.AuthUrl(), 301)
+		http.Redirect(w, r, opID.AuthUrl(), http.StatusMovedPermanently)
 	case "cancel":
-		http.Redirect(w, r, "/", 301)
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	default:
 		steamID, err := opID.ValidateAndGetId()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error(err)
+			log.Error().Err(err).Msg("validate steam OpenID")
 			return
 		}
-		session, err := s.store.Get(r, "atlas-session")
+
+		// sanity steamID
+		_, err = strconv.ParseUint(steamID, 10, 64)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error(err)
+			log.Error().Err(err).Msg("ParseInt")
 			return
 		}
-		session.Values["steamID"] = steamID
 
-		if err := session.Save(r, w); err != nil {
+		// Create a new session and store steamID and privileges
+		session, err := s.store.New(r, "session")
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error(err)
+			log.Error().Err(err).Msg("login new session")
+			s.clearSessionCookie(w)
 			return
 		}
-		http.Redirect(w, r, "/", 301)
-	}
-}
 
-// Determine if the request is an administrator
-func (s *AtlasMapServer) isAdmin(r *http.Request) bool {
-	session, err := s.store.Get(r, "atlas-session")
-	if err != nil {
-		return false
-	}
-	steamID, ok := session.Values["steamID"].(string)
-	if ok {
+		// PlayerID should not change frequently
+		playerID, err := s.GetPlayerIDFromSteamID(steamID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Error().Err(err).Msg("GetPlayerIDFromSteamID")
+			return
+		}
+
+		session.Values["steamID"] = steamID
+		session.Values["playerID"] = playerID
+
+		// Set administrator
 		for _, id := range s.config.AdminSteamIDs {
 			if steamID == id {
-				return true
+				session.Values["admin"] = true
+				break
 			}
 		}
+
+		// Save session and redirect to home
+		if err := session.Save(r, w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Error().Err(err).Msg("save session")
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	}
-	return false
 }
 
 // Determine if the request is a tribe administrator
+/*
 func (s *AtlasMapServer) isTribeAdmin(r *http.Request) bool {
-	session, err := s.store.Get(r, "atlas-session")
+	session, err := s.store.Get(r, "session")
 	if err != nil {
 		return false
 	}
@@ -101,32 +124,4 @@ func (s *AtlasMapServer) isTribeAdmin(r *http.Request) bool {
 	}
 
 	return false
-}
-
-func (s *AtlasMapServer) accountHandler(w http.ResponseWriter, r *http.Request) {
-	session, err := s.store.Get(r, "atlas-session")
-
-	steamID, ok := session.Values["steamID"].(string)
-	if ok {
-		player, err := s.getPlayerDataFromSteamID(steamID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error(err)
-			return
-		}
-
-		w.Header().Set("content-type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(player)
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error(err)
-			return
-		}
-	} else {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Error(err)
-		return
-	}
-}
+}*/

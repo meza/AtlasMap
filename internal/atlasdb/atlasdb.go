@@ -2,7 +2,9 @@
 package atlasdb
 
 import (
-	"github.com/go-redis/redis"
+	"context"
+
+	"github.com/go-redis/redis/v8"
 )
 
 // AtlasDB provides an interface to the Atlas DB
@@ -21,7 +23,7 @@ func NewAtlasDB(address string, password string, db int) (*AtlasDB, error) {
 	}
 
 	// Test connection
-	_, err := s.db.Ping().Result()
+	_, err := s.db.Ping(context.Background()).Result()
 	if err != nil {
 		return nil, err
 	}

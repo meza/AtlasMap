@@ -23,12 +23,6 @@ type Configuration struct {
 
 	AdminSteamIDs []string
 
-	/*
-		RedisAddress       string
-		RedisPassword      string
-		RedisDB            int
-	*/
-
 	// FS Store for now, may change to redis
 	SessionStore string
 	SessionKey   string
@@ -64,7 +58,7 @@ func (s *AtlasMapServer) loadConfig() error {
 	s.config.StaticDir = getEnv("STATICDIR", "./www")
 
 	s.config.SessionStore = getEnv("SESSION_PATH", "./store")
-	s.config.SessionKey = getEnv("SESSION_KEY", string(securecookie.GenerateRandomKey(64)))
+	s.config.SessionKey = getEnv("SESSION_KEY", string(securecookie.GenerateRandomKey(32)))
 
 	s.config.AtlasRedisAddress = getEnv("ATLAS_REDIS_ADDRESS", "localhost:6379")
 	s.config.AtlasRedisPassword = getEnv("ATLAS_REDIS_PASSWORD", "")
