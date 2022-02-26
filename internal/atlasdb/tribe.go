@@ -58,49 +58,58 @@ func (s *AtlasDB) SubTribe(ctx context.Context, tribeID int64) <-chan string {
 	channel := make(chan string, 10)
 	go func() {
 		for {
-			msg, err := sub.ReceiveMessage(ctx)
-			if err != nil {
-				log.Err(err).Msg("SubTribe")
-			}
-
-			/*dmp := hex.Dumper(os.Stdout)
-			dmp.Write([]byte(msg.Payload[12:]))
-			dmp.Close()*/
-			pos := 12
-			switch []byte(msg.Payload)[8] {
-			case 105:
-				{
-					b := &atlasdata.FTribeNotificationChat{}
-					err = struc.Unpack(strings.NewReader(msg.Payload[pos:]), b)
-					if err != nil {
-						log.Err(err).Msg("Unpack")
-					}
+			select {
+			case <-ctx.Done():
+				close(channel)
+				return
+			default:
+				// go-redis doesn't support cancellations 🙃🙃🙃
+				// [TODO] Trace and add cancellation support
+				msg, err := sub.ReceiveMessage(ctx)
+				if err != nil {
+					log.Err(err).Msg("SubTribe")
 				}
-			case 29:
-				{
-					b := &atlasdata.FTribeNotificationAddRemoveEntity{}
-					err = struc.Unpack(strings.NewReader(msg.Payload[pos:]), b)
-					if err != nil {
-						log.Err(err).Msg("Unpack")
+
+				/*dmp := hex.Dumper(os.Stdout)
+				dmp.Write([]byte(msg.Payload[12:]))
+				dmp.Close()*/
+				pos := 12
+				switch []byte(msg.Payload)[8] {
+				case 105:
+					{
+						b := &atlasdata.FTribeNotificationChat{}
+						err = struc.Unpack(strings.NewReader(msg.Payload[pos:]), b)
+						if err != nil {
+							log.Err(err).Msg("Unpack")
+						}
 					}
-					v, err := json.Marshal(TribeEntityUpdate{
-						EntityID:       b.TribeEntity.EntityID.Value,
-						ParentEntityID: b.TribeEntity.ParentEntityID.Value,
-						EntityType:     strings.TrimRight(b.TribeEntity.EntityType.Value.String, "\u0000"),
-						ShipType:       strings.TrimRight(b.TribeEntity.ShipType.Value.String, "\u0000"),
-						EntityName:     strings.TrimRight(b.TribeEntity.EntityName.Value.String, "\u0000"),
-						ServerId:       b.TribeEntity.ServerId.Value,
-						X:              b.TribeEntity.ServerRelativeLocationInCurrentServerMap.Value.X,
-						Y:              b.TribeEntity.ServerRelativeLocationInCurrentServerMap.Value.Y,
-						IsDead:         b.TribeEntity.BIsDead.Value,
-					})
-					if err != nil {
-						log.Err(err).Msg("Marshal")
+				case 29:
+					{
+						b := &atlasdata.FTribeNotificationAddRemoveEntity{}
+						err = struc.Unpack(strings.NewReader(msg.Payload[pos:]), b)
+						if err != nil {
+							log.Err(err).Msg("Unpack")
+						}
+						v, err := json.Marshal(TribeEntityUpdate{
+							EntityID:       b.TribeEntity.EntityID.Value,
+							ParentEntityID: b.TribeEntity.ParentEntityID.Value,
+							EntityType:     strings.TrimRight(b.TribeEntity.EntityType.Value.String, "\u0000"),
+							ShipType:       strings.TrimRight(b.TribeEntity.ShipType.Value.String, "\u0000"),
+							EntityName:     strings.TrimRight(b.TribeEntity.EntityName.Value.String, "\u0000"),
+							ServerId:       b.TribeEntity.ServerId.Value,
+							X:              b.TribeEntity.ServerRelativeLocationInCurrentServerMap.Value.X,
+							Y:              b.TribeEntity.ServerRelativeLocationInCurrentServerMap.Value.Y,
+							IsDead:         b.TribeEntity.BIsDead.Value,
+						})
+						if err != nil {
+							log.Err(err).Msg("Marshal")
+						}
+						channel <- string(v)
 					}
-					channel <- string(v)
 				}
 			}
 		}
+
 	}()
 	return channel
 }

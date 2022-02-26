@@ -29,6 +29,17 @@ func (s *AtlasMapServer) sessionMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		_, ok := session.Values["steamID"].(string)
+		if !ok {
+			http.Error(w, "Not authenticated", http.StatusUnauthorized)
+			return
+		}
+		_, ok = session.Values["playerID"].(int64)
+		if !ok {
+			http.Error(w, "Not authenticated", http.StatusUnauthorized)
+			return
+		}
+
 		r = r.WithContext(context.WithValue(r.Context(), SessionKey, session))
 		next.ServeHTTP(w, r)
 	})
@@ -42,53 +53,47 @@ type accountData struct {
 
 func (s *AtlasMapServer) accountHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	var err error
 
 	session := r.Context().Value(SessionKey).(*sessions.Session)
+	steamID := session.Values["steamID"].(string)
 
-	steamID, ok := session.Values["steamID"].(string)
-	if ok {
-		var err error
-		accData := accountData{}
+	accData := accountData{}
 
-		playerID := session.Values["playerID"].(int64)
-		accData.PlayerServer, err = s.db.GetPlayerServerInfoFromSteamID(r.Context(), steamID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error().Err(err).Msg("db.GetPlayerServerInfoFromSteamID")
-			return
-		}
-
-		accData.Player, err = s.db.GetPlayerInfoFromPlayerID(r.Context(), playerID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error().Err(err).Msg("db.GetPlayerInfoFromPlayerID")
-			return
-		}
-
-		if accData.Player.TribeID > 0 {
-			accData.Tribe, err = s.db.GetTribeByID(r.Context(), accData.Player.TribeID)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				log.Error().Err(err).Msg("db.GetTribeByID")
-				return
-			}
-		}
-
-		// output json struct
-		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(accData)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Error().Err(err).Msg("accountHandler json encode")
-			return
-		}
+	playerID := session.Values["playerID"].(int64)
+	accData.PlayerServer, err = s.db.GetPlayerServerInfoFromSteamID(r.Context(), steamID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Error().Err(err).Msg("db.GetPlayerServerInfoFromSteamID")
 		return
 	}
 
-	// If we error or do not match steamID, return nothing
+	accData.Player, err = s.db.GetPlayerInfoFromPlayerID(r.Context(), playerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Error().Err(err).Msg("db.GetPlayerInfoFromPlayerID")
+		return
+	}
+
+	if accData.Player.TribeID > 0 {
+		accData.Tribe, err = s.db.GetTribeByID(r.Context(), accData.Player.TribeID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Error().Err(err).Msg("db.GetTribeByID")
+			return
+		}
+	}
+
+	// output json struct
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("{}"))
+	err = json.NewEncoder(w).Encode(accData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Error().Err(err).Msg("accountHandler json encode")
+		return
+	}
 }
 
 func (s *AtlasMapServer) eventHandler(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +134,7 @@ func (s *AtlasMapServer) eventHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "data: %s\n\n", msg)
 			flusher.Flush()
 		case <-r.Context().Done():
-			fmt.Println("event channel closed")
+			log.Debug().Msgf("eventHandler %s", r.Context().Err())
 			flusher.Flush()
 			return
 		}

@@ -10,15 +10,19 @@ import (
 )
 
 type EventBroker struct {
-	users     sync.Map
-	usersMut  sync.Mutex
-	tribes    sync.Map
-	tribesMut sync.Mutex
-	db        *atlasdb.AtlasDB
+	users       sync.Map
+	usersMut    sync.Mutex
+	tribes      sync.Map
+	tribesMut   sync.Mutex
+	db          *atlasdb.AtlasDB
+	tribeCancel map[int64]context.CancelFunc
 }
 
 func NewEventBroker(db *atlasdb.AtlasDB) *EventBroker {
-	return &EventBroker{db: db}
+	return &EventBroker{
+		db:          db,
+		tribeCancel: make(map[int64]context.CancelFunc),
+	}
 }
 
 func (s *EventBroker) AddUser(steamID string, tribeID int64) chan string {
@@ -38,8 +42,10 @@ func (s *EventBroker) AddUser(steamID string, tribeID int64) chan string {
 		s.tribes.Store(tribeID, append(tribes, channel))
 	}
 
-	if !loaded || len(tribes) == 1 {
-		s.subTribe(tribeID)
+	// subscribe to tribe channel and save cancel function
+	log.Debug().Msgf("subscribing to tribe %d  known tribes: %d  subbed before: %v", tribeID, len(tribes), loaded)
+	if !loaded || len(tribes) == 0 {
+		s.tribeCancel[tribeID] = s.subTribe(tribeID)
 	}
 
 	s.tribesMut.Unlock()
@@ -50,6 +56,7 @@ func (s *EventBroker) RemoveChannel(channel chan string) {
 	s.usersMut.Lock()
 	s.tribesMut.Lock()
 
+	// Remove any user channels
 	s.users.Range(func(k, v interface{}) bool {
 		users := v.([]chan string)
 		changed := false
@@ -59,12 +66,14 @@ func (s *EventBroker) RemoveChannel(channel chan string) {
 				changed = true
 			}
 		}
+		// Store if there were changes
 		if changed {
 			s.users.Store(k, users)
 		}
 		return true
 	})
 
+	// Remove any tribe channels
 	s.tribes.Range(func(k, v interface{}) bool {
 		tribes := v.([]chan string)
 		changed := false
@@ -74,6 +83,17 @@ func (s *EventBroker) RemoveChannel(channel chan string) {
 				changed = true
 			}
 		}
+
+		// if there are no channels left, cancel the context
+		if len(tribes) == 0 {
+			if _, ok := s.tribeCancel[k.(int64)]; ok {
+				log.Debug().Msgf("canceling tribe %d", k)
+				s.tribeCancel[k.(int64)]()
+				delete(s.tribeCancel, k.(int64))
+			}
+		}
+
+		// Store if there were changes
 		if changed {
 			s.tribes.Store(k, tribes)
 		}
@@ -110,17 +130,22 @@ func (s *EventBroker) SendTribe(tribeID int64, value string) error {
 	return nil
 }
 
-func (s *EventBroker) subTribe(tribeID int64) {
+func (s *EventBroker) subTribe(tribeID int64) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := s.db.SubTribe(ctx, tribeID)
 	go func() {
 		for {
-			if err := s.SendTribe(tribeID, <-c); err != nil {
-				// exit out and close the channel
-				log.Err(err).Msg("broker.sendtribe")
-				cancel()
+			select {
+			case msg := <-c:
+				if err := s.SendTribe(tribeID, msg); err != nil {
+					// exit out and close the channel
+					log.Err(err).Msg("broker.sendtribe")
+					return
+				}
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
+	return cancel
 }

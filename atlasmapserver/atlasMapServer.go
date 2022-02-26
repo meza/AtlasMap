@@ -99,7 +99,7 @@ func (s *AtlasMapServer) Run() error {
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir(s.config.StaticDir)))
 
 	endpoint := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
-	log.Info().Msgf("Listening on %s", endpoint)
+	log.Info().Msgf("listening on %s", endpoint)
 	return http.ListenAndServe(endpoint, s.router)
 }
 

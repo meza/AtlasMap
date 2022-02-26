@@ -16,6 +16,8 @@ const (
 )
 
 func (s *AtlasMapServer) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
 	session, ok := r.Context().Value(SessionKey).(*sessions.Session)
 	if ok {
 		// Force deletion of the cookie and session
@@ -32,7 +34,7 @@ func (s *AtlasMapServer) logoutHandler(w http.ResponseWriter, r *http.Request) {
 		s.clearSessionCookie(w)
 	}
 
-	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func (s *AtlasMapServer) clearSessionCookie(w http.ResponseWriter) {
@@ -40,6 +42,7 @@ func (s *AtlasMapServer) clearSessionCookie(w http.ResponseWriter) {
 }
 
 func (s *AtlasMapServer) loginHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
 	opID := steam_go.NewOpenId(r)
 	switch opID.Mode() {
 	case "":
@@ -96,7 +99,7 @@ func (s *AtlasMapServer) loginHandler(w http.ResponseWriter, r *http.Request) {
 			log.Error().Err(err).Msg("save session")
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 	}
 }
 

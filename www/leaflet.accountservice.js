@@ -11,18 +11,17 @@ L.Control.AccountService = L.Control.extend({
 
     onAdd: function(map) {
         let container = L.DomUtil.create('div', 'leaflet-control-zoom leaflet-bar leaflet-control');
-
         this._map = map;
         fetch('/s/account', {
                 dataType: 'json'
             })
-            .then(res => res.json())
-            .then(account => {
-                if (account.Player === undefined) {
+            .then(r => {
+                if (!r.ok && r.status == 401) {
                     this._createButton('<i class="fa-brands fa-steam" aria-hidden="true"></i>', 'Login with Steam',
                         'leaflet-control-pin leaflet-bar-part leaflet-bar-part-top-and-bottom',
                         container, this._login, this)
                 } else {
+                    account = r.json()
                     this._createButton('<i class="fa-solid fa-arrow-right-from-bracket"></i>', 'logout',
                         'leaflet-control-pin leaflet-bar-part leaflet-bar-part-top-and-bottom',
                         container, this._logout, this)
