@@ -40,19 +40,48 @@ func (s *AtlasDB) GetTribeByID(ctx context.Context, tribeID int64) (*TribeData, 
 	return p, nil
 }
 
-type TribeEntityUpdate struct {
-	EntityID       uint32
-	ParentEntityID uint32
-	EntityType     string
-	ShipType       string
-	EntityName     string
-	ServerId       uint32
-	X              float32
-	Y              float32
-	IsDead         bool
+// GetTribeEntityIDList returns the tribe entitiy ID list.
+func (s *AtlasDB) GetTribeEntityIDList(ctx context.Context, tribeID int64) ([]int64, error) {
+	p := []int64{}
+	if err := s.db.SMembers(ctx, "tribedata.entities:"+strconv.FormatInt(tribeID, 10)).ScanSlice(p); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
-// SubTribe returns a channel pumped with json event data from the tribe
+// GetTribeEntities returns the tribe entitiy ID list.
+func (s *AtlasDB) GetTribeEntities(ctx context.Context, tribeID int64) ([]TribeEntityUpdate, error) {
+	list := []TribeEntityUpdate{}
+	ids, err := s.GetTribeEntityIDList(ctx, tribeID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		p := TribeEntityUpdate{}
+		err := s.db.HMGet(ctx, "entityinfo:"+strconv.FormatInt(id, 10)).Scan(&p)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, p)
+	}
+
+	return list, nil
+}
+
+type TribeEntityUpdate struct {
+	EntityID       uint32  `redis:"EntityID"`
+	ParentEntityID uint32  `redis:"ParentEntityID"`
+	EntityType     string  `redis:"EntityType"`
+	ShipType       string  `redis:"ShipType"`
+	EntityName     string  `redis:"EntityName"`
+	ServerId       uint32  `redis:"ServerId"`
+	X              float32 `redis:"ServerXRelativeLocation"`
+	Y              float32 `redis:"ServerYRelativeLocation"`
+	IsDead         bool    `redis:"bIsDead"`
+}
+
+// SubTribe returns a channel pumped with json event data from the tribe.
 func (s *AtlasDB) SubTribe(ctx context.Context, tribeID int64) <-chan string {
 	sub := s.db.Subscribe(ctx, "tribemsg:"+strconv.FormatInt(tribeID, 10))
 	channel := make(chan string, 10)

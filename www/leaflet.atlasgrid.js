@@ -1,3 +1,5 @@
+/* global L, config*/
+
 L.AtlasGrid = L.LayerGroup.extend({
     options: {
         xticks: 2,
@@ -12,12 +14,12 @@ L.AtlasGrid = L.LayerGroup.extend({
         },
     },
 
-    initialize: function (options) {
+    initialize: function(options) {
         L.LayerGroup.prototype.initialize.call(this);
         L.Util.setOptions(this, options);
     },
 
-    onAdd: function (map) {
+    onAdd: function(map) {
         this._map = map;
         var grid;
         var me = this;
@@ -28,7 +30,7 @@ L.AtlasGrid = L.LayerGroup.extend({
                 dataType: 'json'
             })
             .then(res => res.json())
-            .then(function (grids) {
+            .then(function(grids) {
 
                 grid = me.draw(grids);
             })
@@ -37,11 +39,11 @@ L.AtlasGrid = L.LayerGroup.extend({
             });
     },
 
-    onRemove: function (map) {
+    onRemove: function(map) {
         this.eachLayer(this.removeLayer, this);
     },
 
-    draw: function (grids) {
+    draw: function(grids) {
         var bounds = this._map._originalBounds;
         let xTickSize = (bounds.getEast() - bounds.getWest()) / this.options.xticks;
         let yTickSize = (bounds.getSouth() - bounds.getNorth()) / this.options.yticks;
@@ -110,7 +112,7 @@ L.AtlasGrid = L.LayerGroup.extend({
                 switch (grids[grid].forceServerRules) {
                     case 1: // Lawless
                         serverType = ""
-                        break;                    
+                        break;
                     case 2: // Lawless claim
                         serverType = "&#9760;"
                         break;
@@ -119,6 +121,7 @@ L.AtlasGrid = L.LayerGroup.extend({
                         break;
                     case 4:
                         serverType = "&#9774;"
+                        break;
                     default:
                 }
 
@@ -131,7 +134,7 @@ L.AtlasGrid = L.LayerGroup.extend({
     }
 });
 
-L.atlasgrid = function (options) {
+L.atlasgrid = function(options) {
     return new L.Grid(options);
 };
 

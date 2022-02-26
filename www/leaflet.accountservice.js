@@ -1,3 +1,5 @@
+/* global L, config*/
+
 L.Control.AccountService = L.Control.extend({
     options: {
         position: 'topleft'
@@ -14,19 +16,17 @@ L.Control.AccountService = L.Control.extend({
         this._map = map;
         fetch('/s/account', {
                 dataType: 'json'
-            })
-            .then(r => {
-                if (!r.ok && r.status == 401) {
-                    this._createButton('<i class="fa-brands fa-steam" aria-hidden="true"></i>', 'Login with Steam',
-                        'leaflet-control-pin leaflet-bar-part leaflet-bar-part-top-and-bottom',
-                        container, this._login, this)
-                } else {
-                    account = r.json()
+            }).then(r => {
+                r.json().then(account => {
                     this._createButton('<i class="fa-solid fa-arrow-right-from-bracket"></i>', 'logout',
                         'leaflet-control-pin leaflet-bar-part leaflet-bar-part-top-and-bottom',
                         container, this._logout, this)
                     this._startEventListener(map);
-                }
+                }).catch(error => {
+                    this._createButton('<i class="fa-brands fa-steam" aria-hidden="true"></i>', 'Login with Steam',
+                        'leaflet-control-pin leaflet-bar-part leaflet-bar-part-top-and-bottom',
+                        container, this._login, this)
+                })
             })
             .catch(error => {
                 console.log("backend unavailable; not enabling login", error)

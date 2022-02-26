@@ -1,5 +1,7 @@
-L.interpolatePosition = function(p1, p2, duration, t) {
-    var k = t / duration;
+/* global L*/
+
+L.interpolate = function(p1, p2, duration, t) {
+    let k = t / duration;
     k = (k > 0) ? k : 0;
     k = (k > 1) ? 1 : k;
     return L.latLng(p1.lat + k * (p2.lat - p1.lat),
@@ -7,7 +9,6 @@ L.interpolatePosition = function(p1, p2, duration, t) {
 };
 
 L.Marker.MovingMarker = L.Marker.extend({
-
     //state constants
     statics: {
         notStartedState: 0,
@@ -18,13 +19,13 @@ L.Marker.MovingMarker = L.Marker.extend({
 
     options: {
         autostart: false,
-        loop: false,
+        loop: false
     },
 
     initialize: function(latlngs, durations, options) {
         L.Marker.prototype.initialize.call(this, latlngs[0], options);
 
-        this._latlngs = latlngs.map(function(e, index) {
+        this._latlngs = latlngs.map(function(e) {
             return L.latLng(e);
         });
 
@@ -283,7 +284,7 @@ L.Marker.MovingMarker = L.Marker.extend({
             return;
         }
 
-        if (elapsedTime != null) {
+        if (elapsedTime !== null) {
             // compute the position
             var p = L.interpolatePosition(this._currentLine[0],
                 this._currentLine[1],
