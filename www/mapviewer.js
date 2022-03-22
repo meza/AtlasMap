@@ -130,7 +130,7 @@ class WorldMap extends React.Component {
             map.on('zoomend', function() {
                 if (map.getZoom() < 5) {
                     if (!stickyLayers.Bosses) map.removeLayer(map.Bosses);
-                    if (!stickyLayers.Stones) map.removeLayer(map);
+                    if (!stickyLayers.Stones) map.removeLayer(map.Stones);
                 } else {
                     if (!stickyLayers.Bosses) {
                         map.addLayer(map.Bosses);

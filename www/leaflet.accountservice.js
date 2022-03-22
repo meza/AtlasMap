@@ -4,6 +4,27 @@ L.Control.AccountService = L.Control.extend({
     options: {
         position: 'topleft'
     },
+
+    // hardcode for now
+    _icons: {
+        'Bed': "Item_SimpleBed_Icon",
+        "Broadsider": "KrakenShipNewIcon",
+        "Carrack": "Galley_Icon",
+        "Cog": "Galley_Icon",
+        "Harrier": "Raft_Icon",
+        "Kraken": "KrakenShipNewIcon",
+        "MortarShip": "Raft_Icon",
+        "Ramming_Galley": "Galley_Icon",
+        "Galleon": "Item_GalleonHull_Icon",
+        "Raft": "Raft_Icon",
+        "Schooner": "Item_SchoonerHull_Icon",
+        "Sloop": "Item_SloopHull_Icon",
+        "Sloop_FromNPC": "Item_SloopHull_Icon",
+        "Submarine": "Item_SloopHull_Icon",
+        "TrampFreighter": "ICON_Tramp_Freighter",
+        "TurtleShip": "Turtleship_Icon",
+    },
+
     _ships: {},
     _eventSource: {},
 
@@ -50,10 +71,12 @@ L.Control.AccountService = L.Control.extend({
 
     _processEntity: function(d) {
         switch (d.EntityType) {
+            case "Ship":
             case "ETribeEntityType::Ship":
                 this._trackShip(d)
                 break
 
+            case "Bed":
             case "ETribeEntityType::Bed":
                 console.dir(d) // slap bed on map
                 break
@@ -68,6 +91,8 @@ L.Control.AccountService = L.Control.extend({
             unrealY = config.GridSize * d.Y + config.GridSize * y,
             gps = unrealToLeaflet(unrealX, unrealY);
 
+        console.log(d)
+
         let ship = this._ships[d.EntityID];
         if (ship === undefined) {
             ship = L.Marker.movingMarker([gps], [duration]).addTo(this._map)
@@ -78,8 +103,6 @@ L.Control.AccountService = L.Control.extend({
         console.log(unrealX, unrealY, gps)
         this._ships[d.EntityID] = ship;
     },
-
-
 
     _login: function() {
         window.location = "/login";

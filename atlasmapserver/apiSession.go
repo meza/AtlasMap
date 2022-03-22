@@ -126,8 +126,27 @@ func (s *AtlasMapServer) eventHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	channel := s.broker.AddUser(steamID, playerInfo.TribeID)
-
 	defer s.broker.RemoveChannel(channel)
+
+	// send initial entries
+	entities, err := s.db.GetTribeEntities(r.Context(), playerInfo.TribeID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Error().Err(err).Msg("db.GetPlayerInfoFromPlayerID")
+		return
+	}
+
+	for _, entity := range entities {
+		v, err := json.Marshal(entity)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Error().Err(err).Msg("db.GetPlayerInfoFromPlayerID")
+			return
+		}
+		channel <- string(v)
+	}
+
+	// stream the rest
 	for {
 		select {
 		case msg := <-channel:

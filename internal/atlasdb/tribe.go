@@ -43,7 +43,7 @@ func (s *AtlasDB) GetTribeByID(ctx context.Context, tribeID int64) (*TribeData, 
 // GetTribeEntityIDList returns the tribe entitiy ID list.
 func (s *AtlasDB) GetTribeEntityIDList(ctx context.Context, tribeID int64) ([]int64, error) {
 	p := []int64{}
-	if err := s.db.SMembers(ctx, "tribedata.entities:"+strconv.FormatInt(tribeID, 10)).ScanSlice(p); err != nil {
+	if err := s.db.SMembers(ctx, "tribedata.entities:"+strconv.FormatInt(tribeID, 10)).ScanSlice(&p); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -59,10 +59,11 @@ func (s *AtlasDB) GetTribeEntities(ctx context.Context, tribeID int64) ([]TribeE
 
 	for _, id := range ids {
 		p := TribeEntityUpdate{}
-		err := s.db.HMGet(ctx, "entityinfo:"+strconv.FormatInt(id, 10)).Scan(&p)
+		err := s.db.HGetAll(ctx, "entityinfo:"+strconv.FormatInt(id, 10)).Scan(&p)
 		if err != nil {
 			return nil, err
 		}
+
 		list = append(list, p)
 	}
 
@@ -114,6 +115,7 @@ func (s *AtlasDB) SubTribe(ctx context.Context, tribeID int64) <-chan string {
 					}
 				case 29:
 					{
+						// [TODO] find a better way to remove trailing null byte
 						b := &atlasdata.FTribeNotificationAddRemoveEntity{}
 						err = struc.Unpack(strings.NewReader(msg.Payload[pos:]), b)
 						if err != nil {
