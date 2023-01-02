@@ -1,4 +1,4 @@
-const config = {
+{
 	"GPSBounds": {
 		"max": [
 			100,
@@ -15,5 +15,11 @@ const config = {
 	"XRange": 200,
 	"XScale": 1,
 	"YRange": 200,
-	"YScale": 1
+	"YScale": 1,
+	"ItemLink": true,
+	"KofiLink": true,
+	"NodesPerAxis": 30,
+	"PathFinder": true,
+	"PinTool": true,
+	"AtlasMapServer": false,
 }
