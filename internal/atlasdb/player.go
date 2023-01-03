@@ -9,10 +9,10 @@ import (
 )
 
 type PlayerServerInfo struct {
-	PlayerId          string `redis:"PlayerId"`
-	CurrentServerId   int64  `redis:"CurrentServerId"`
-	FirstHomeServerId int64  `redis:"FirstHomeServerId"`
-	LogLineId         int64  `redis:"LogLineId"`
+	PlayerID          string `redis:"PlayerId"`
+	CurrentServerID   int64  `redis:"CurrentServerId"`
+	FirstHomeServerID int64  `redis:"FirstHomeServerId"`
+	LogLineID         int64  `redis:"LogLineId"`
 }
 
 // GetPlayerSteamID returns the SteamID of a playerID.
@@ -25,11 +25,11 @@ func (s *AtlasDB) GetPlayerServerInfoFromSteamID(ctx context.Context, steamID st
 }
 
 type PlayerInfo struct {
-	PlayerId     int64  `redis:"PlayerId"`
+	PlayerID     int64  `redis:"PlayerId"`
 	TribeID      int64  `redis:"TribeID"`
 	PlayerName   string `redis:"PlayerName"`
 	LastOnlineAt int64  `redis:"LastOnlineAt"`
-	RankGroupId  int    `redis:"RankGroupId"`
+	RankGroupID  int    `redis:"RankGroupId"`
 }
 
 // GetPlayerSteamID returns the SteamID of a playerID.

@@ -49,39 +49,8 @@ type FBoolProperty struct {
 	Value         bool
 }
 
-type FTribeEntity struct {
-	EntityID                                 FUInt32Property
-	ParentEntityID                           FUInt32Property
-	EntityType                               FByteProperty
-	ShipType                                 FByteProperty
-	EntityName                               FStringProperty
-	ServerId                                 FUInt32Property
-	ServerRelativeLocationInCurrentServerMap FVector2DProperty
-	NextAllowedUseTime                       FUInt32Property
-	BInLandClaimedFlagRange                  FBoolProperty
-	BReachedMaxTravelCount                   FBoolProperty
-	BIsDead                                  FBoolProperty
-}
-
-type FTribeNotificationChat struct {
-	SenderName       FString
-	SenderSteamName  FString
-	SenderTribeName  FString
-	SenderId         uint32 `struc:"uint32,little"`
-	Message          FString
-	SenderTeamIndex  int32 `struc:"int32,little"`
-	SendMode         FString
-	UserId           FString
-	BUseAdminIcon    bool  `struc:"bool"`
-	BIsTribeOwner    bool  `struc:"bool"`
-	PlayerBadgeGroup int32 `struc:"int32,little"`
-}
-
-type FTribeNotificationAddRemoveEntity struct {
-	BIsNewEntity          bool `struc:"bool"`
-	BIsJustLocationChange bool `struc:"bool"`
-	TribeEntity           FTribeEntity
-}
-
 type BubbleWrap struct {
+	ServerVersion int32  `struc:"int32,little"`
+	ServerID      uint32 `struc:"uint32,little"`
+	CRC           int32  `struc:"int32,little"`
 }

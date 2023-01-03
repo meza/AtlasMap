@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/antihax/AtlasMap/atlasmapserver"
+	"github.com/antihax/AtlasMap/pkg/atlasmapserver"
 )
 
 func main() {
