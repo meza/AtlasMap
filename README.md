@@ -9,6 +9,8 @@ Use a reverse proxy (nginx, haproxy) with tls certificates installed (letsencryp
 
 You need to generate a slippy style map (See ServerGridEditor or other tools), clear out and replace all files in `www/tiles/*` with your map files. Make sure to match the server grid size in config.js and setup the following config options in sections below. Note: Untested with non square grids currently but we definitely want this to work if it doesn't already
 
+You also need to use the [Extract Plugin](https://github.com/antihax/ATLAS-Extract-Plugin) to get all the functionality out of the server.
+
 ### Web Service
 The following environment variables can be set to reconfigure the service:
 
