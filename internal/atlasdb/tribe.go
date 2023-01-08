@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -125,6 +126,11 @@ func (s *AtlasDB) processTribeMessage(msg string, channel chan string, CRC int32
 				log.Err(err).Msg("Unpack")
 				return err
 			}
+
+			// Hack to deal with inconsistent shiptypes
+			b.TribeEntity.ShipType.Value.String = strings.Replace(b.TribeEntity.ShipType.Value.String, "EShipType::", "", 1)
+			b.TribeEntity.EntityType.Value.String = strings.Replace(b.TribeEntity.ShipType.Value.String, "ETribeEntityType::", "", 1)
+
 			v, err := json.Marshal(TribeEntityUpdate{
 				EntityID:       b.TribeEntity.EntityID.Value,
 				ParentEntityID: b.TribeEntity.ParentEntityID.Value,
@@ -136,6 +142,7 @@ func (s *AtlasDB) processTribeMessage(msg string, channel chan string, CRC int32
 				Y:              b.TribeEntity.ServerRelativeLocationInCurrentServerMap.Value.Y,
 				IsDead:         b.TribeEntity.BIsDead.Value,
 			})
+
 			if err != nil {
 				log.Err(err).Msg("Marshal")
 				return err
@@ -144,7 +151,7 @@ func (s *AtlasDB) processTribeMessage(msg string, channel chan string, CRC int32
 		}
 	default:
 		log.Info().Msgf("unknown crc %d", CRC)
-		log.Debug().Msg(hex.Dump([]byte(msg)))
+		fmt.Println(hex.Dump([]byte(msg)))
 	}
 	return nil
 }
@@ -165,12 +172,11 @@ func (s *AtlasDB) processTribeChannel(ctx context.Context, channel chan string, 
 
 			// Unpack header from the message
 			bubbleWrap := &atlasdata.BubbleWrap{}
-			err = struc.Unpack(strings.NewReader(msg.Payload[:12]), bubbleWrap)
-			if err != nil {
+			if err := struc.Unpack(strings.NewReader(msg.Payload[:12]), bubbleWrap); err != nil {
 				log.Err(err).Msg("Unpack")
 			}
 			if err := s.processTribeMessage(msg.Payload[12:], channel, bubbleWrap.CRC); err != nil {
-
+				log.Err(err).Msg("processTribeMessage")
 			}
 		}
 	}
